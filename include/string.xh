@@ -18,7 +18,7 @@ struct __attribute__((refId("edu:umn:cs:melt:exts:ableC:string:string"),
 // Other functions are in theory OK to call directly
 static inline void _check_index_string(string s, size_t i) {
   if (i < 0 || i >= s.length) {
-    fprintf(stderr, "String index out of bounds: length %lu, index %lu", s.length, i);
+    fprintf(stderr, "String index out of bounds: length %lu, index %lu\n", s.length, i);
     exit(1);
   }
 }
@@ -67,7 +67,7 @@ static inline string _remove_string(string s1, string s2) {
 
 static inline string _substring(string s, size_t start, size_t end) {
   if (start < 0 || start >= s.length || end < 0 || end >= s.length || start > end) {
-    fprintf(stderr, "Substring index out of bounds: length %lu, start %lu, end %lu", s.length, start, end);
+    fprintf(stderr, "Substring index out of bounds: length %lu, start %lu, end %lu\n", s.length, start, end);
     exit(1);
   }
   char *result = GC_malloc(end - start + 1);
