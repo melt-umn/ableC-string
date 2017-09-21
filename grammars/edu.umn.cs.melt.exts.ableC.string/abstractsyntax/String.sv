@@ -14,7 +14,7 @@ imports edu:umn:cs:melt:ableC:abstractsyntax:overload as ovrld;
 
 global builtin::Location = builtinLoc("string");
 
-aspect function ovrld:getAddOpOverload
+aspect function ovrld:getAddOverload
 Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
 {
   lOverloads <-
@@ -29,7 +29,7 @@ Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
          appendString(strExpr(lhs, location=loc), rhs, location=loc))];
 }
 
-aspect function ovrld:getSubOpOverload
+aspect function ovrld:getSubOverload
 Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
 {
   lOverloads <-
