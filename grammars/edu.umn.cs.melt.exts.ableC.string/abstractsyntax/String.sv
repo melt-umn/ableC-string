@@ -79,22 +79,22 @@ Maybe<(Expr ::= Expr Expr Location)> ::= t::Type env::Decorated Env
 }
 
 aspect function ovrld:getSubscriptAssignOverload
-Maybe<(Expr ::= Expr Expr Expr Location)> ::= t::Type env::Decorated Env
+Maybe<(Expr ::= Expr Expr (Expr ::= Expr Expr Location) Document Expr Location)> ::= t::Type env::Decorated Env
 {
   overloads <-
     [pair(
        "edu:umn:cs:melt:exts:ableC:string:string",
-       \ l::Expr i::Expr r::Expr loc::Location ->
+       \ l::Expr i::Expr o::(Expr ::= Expr Expr Location) opPP::Document r::Expr loc::Location ->
          errorExpr([err(loc, "Strings are immutable, cannot assign to index")], location=loc))];
 }
 
 aspect function ovrld:getMemberAssignOverload
-Maybe<(Expr ::= Expr Boolean Name Expr Location)> ::= t::Type env::Decorated Env
+Maybe<(Expr ::= Expr Boolean Name (Expr ::= Expr Expr Location) Document Expr Location)> ::= t::Type env::Decorated Env
 {
   overloads <-
     [pair(
        "edu:umn:cs:melt:exts:ableC:string:string",
-       \ l::Expr d::Boolean m::Name r::Expr loc::Location ->
+       \ l::Expr d::Boolean m::Name o::(Expr ::= Expr Expr Location) opPP::Document r::Expr loc::Location ->
          errorExpr([err(loc, s"Cannot assign to field ${m.name} of string")], location=loc))];
 }
 
