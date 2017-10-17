@@ -3,11 +3,11 @@ grammar edu:umn:cs:melt:exts:ableC:string:abstractsyntax;
 imports silver:langutil;
 imports silver:langutil:pp;
 
-imports edu:umn:cs:melt:ableC:abstractsyntax;
+imports edu:umn:cs:melt:ableC:abstractsyntax:host;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
 imports edu:umn:cs:melt:ableC:abstractsyntax:env;
 imports edu:umn:cs:melt:ableC:abstractsyntax:substitution;
-imports edu:umn:cs:melt:ableC:abstractsyntax:overload as ovrld;
+imports edu:umn:cs:melt:ableC:abstractsyntax:overloadable as ovrld;
 --imports edu:umn:cs:melt:ableC:abstractsyntax:debug;
 
 global builtin::Location = builtinLoc("string");
@@ -37,13 +37,13 @@ Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
          removeString(lhs, strExpr(rhs, location=loc), location=loc))];
 }
 
-aspect function ovrld:getMulOpOverload
+aspect function ovrld:getMulOverload
 Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
 {
   lOverloads <- [pair("edu:umn:cs:melt:exts:ableC:string:string", repeatString(_, _, location=_))];
 }
 
-aspect function ovrld:getEqualsOpOverload
+aspect function ovrld:getEqualsOverload
 Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
 {
   lOverloads <-
@@ -58,7 +58,7 @@ Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
          eqString(strExpr(lhs, location=loc), rhs, location=loc))];
 }
 
-aspect function ovrld:getEqOpOverload
+aspect function ovrld:getEqOverload
 Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
 {
   lOverloads <- [pair("edu:umn:cs:melt:exts:ableC:string:string", assignString(_, _, location=_))];
@@ -79,22 +79,22 @@ Maybe<(Expr ::= Expr Expr Location)> ::= t::Type env::Decorated Env
 }
 
 aspect function ovrld:getSubscriptAssignOverload
-Maybe<(Expr ::= Expr Expr AssignOp Expr Location)> ::= t::Type env::Decorated Env
+Maybe<(Expr ::= Expr Expr Expr Location)> ::= t::Type env::Decorated Env
 {
   overloads <-
     [pair(
        "edu:umn:cs:melt:exts:ableC:string:string",
-       \ l::Expr i::Expr op::AssignOp r::Expr loc::Location ->
+       \ l::Expr i::Expr r::Expr loc::Location ->
          errorExpr([err(loc, "Strings are immutable, cannot assign to index")], location=loc))];
 }
 
 aspect function ovrld:getMemberAssignOverload
-Maybe<(Expr ::= Expr Boolean Name AssignOp Expr Location)> ::= t::Type env::Decorated Env
+Maybe<(Expr ::= Expr Boolean Name Expr Location)> ::= t::Type env::Decorated Env
 {
   overloads <-
     [pair(
        "edu:umn:cs:melt:exts:ableC:string:string",
-       \ l::Expr d::Boolean m::Name op::AssignOp r::Expr loc::Location ->
+       \ l::Expr d::Boolean m::Name r::Expr loc::Location ->
          errorExpr([err(loc, s"Cannot assign to field ${m.name} of string")], location=loc))];
 }
 
@@ -334,9 +334,8 @@ top::Expr ::= lhs::Expr rhs::Expr
   top.pp = pp"${lhs.pp} = ${rhs.pp}";
   
   forwards to
-    binaryOpExpr(
+    eqExpr(
       lhs,
-      assignOp(eqOp(location=builtin), location=builtin),
       strExpr(rhs, location=builtin),
       location=builtin);
 }
