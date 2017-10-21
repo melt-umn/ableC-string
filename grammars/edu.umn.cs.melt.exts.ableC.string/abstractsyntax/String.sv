@@ -12,7 +12,7 @@ imports edu:umn:cs:melt:ableC:abstractsyntax:overloadable as ovrld;
 
 global builtin::Location = builtinLoc("string");
 
-aspect function ovrld:getAddOverload
+aspect function ovrld:getAddOverloadProd
 Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
 {
   lOverloads <-
@@ -27,7 +27,7 @@ Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
          appendString(strExpr(lhs, location=loc), rhs, location=loc))];
 }
 
-aspect function ovrld:getSubOverload
+aspect function ovrld:getSubOverloadProd
 Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
 {
   lOverloads <-
@@ -37,13 +37,13 @@ Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
          removeString(lhs, strExpr(rhs, location=loc), location=loc))];
 }
 
-aspect function ovrld:getMulOverload
+aspect function ovrld:getMulOverloadProd
 Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
 {
   lOverloads <- [pair("edu:umn:cs:melt:exts:ableC:string:string", repeatString(_, _, location=_))];
 }
 
-aspect function ovrld:getEqualsOverload
+aspect function ovrld:getEqualsOverloadProd
 Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
 {
   lOverloads <-
@@ -58,27 +58,27 @@ Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
          eqString(strExpr(lhs, location=loc), rhs, location=loc))];
 }
 
-aspect function ovrld:getEqOverload
+aspect function ovrld:getEqOverloadProd
 Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
 {
   lOverloads <- [pair("edu:umn:cs:melt:exts:ableC:string:string", assignString(_, _, location=_))];
 }
 
-aspect function ovrld:getMemberCallOverload
+aspect function ovrld:getMemberCallOverloadProd
 Maybe<(Expr ::= Expr Boolean Name Exprs Location)> ::= t::Type env::Decorated Env
 {
   overloads <-
     [pair("edu:umn:cs:melt:exts:ableC:string:string", memberCallString(_, _, _, _, location=_))];
 }
 
-aspect function ovrld:getArraySubscriptOverload
+aspect function ovrld:getArraySubscriptOverloadProd
 Maybe<(Expr ::= Expr Expr Location)> ::= t::Type env::Decorated Env
 {
   overloads <-
     [pair("edu:umn:cs:melt:exts:ableC:string:string", subscriptString(_, _, location=_))];
 }
 
-aspect function ovrld:getSubscriptAssignOverload
+aspect function ovrld:getSubscriptAssignOverloadProd
 Maybe<(Expr ::= Expr Expr (Expr ::= Expr Expr Location) Expr Location)> ::= t::Type env::Decorated Env
 {
   overloads <-
@@ -88,7 +88,7 @@ Maybe<(Expr ::= Expr Expr (Expr ::= Expr Expr Location) Expr Location)> ::= t::T
          errorExpr([err(loc, "Strings are immutable, cannot assign to index")], location=loc))];
 }
 
-aspect function ovrld:getMemberAssignOverload
+aspect function ovrld:getMemberAssignOverloadProd
 Maybe<(Expr ::= Expr Boolean Name (Expr ::= Expr Expr Location) Expr Location)> ::= t::Type env::Decorated Env
 {
   overloads <-
@@ -98,20 +98,20 @@ Maybe<(Expr ::= Expr Boolean Name (Expr ::= Expr Expr Location) Expr Location)> 
          errorExpr([err(loc, s"Cannot assign to field ${m.name} of string")], location=loc))];
 }
 
-function getShowOverload
+function getShowOverloadProd
 Maybe<(Expr ::= Expr Location)> ::= t::Type env::Decorated Env
 {
   production attribute overloads::[Pair<String (Expr ::= Expr Location)>] with ++;
   overloads := [pair("edu:umn:cs:melt:exts:ableC:string:string", showString(_, location=_))];
-  return ovrld:getUnaryOverload(t, env, overloads);
+  return ovrld:getUnaryOverloadProd(t, env, overloads);
 }
 
-function getStrOverload
+function getStrOverloadProd
 Maybe<(Expr ::= Expr Location)> ::= t::Type env::Decorated Env
 {
   production attribute overloads::[Pair<String (Expr ::= Expr Location)>] with ++;
   overloads := [pair("edu:umn:cs:melt:exts:ableC:string:string", strString(_, location=_))];
-  return ovrld:getUnaryOverload(t, env, overloads);
+  return ovrld:getUnaryOverloadProd(t, env, overloads);
 }
 
 abstract production showExpr
@@ -122,7 +122,7 @@ top::Expr ::= e::Expr
   
   local localErrors::[Message] = e.errors;
   local fwrd::Expr =
-    fromMaybe(showHost(_, location=_), getShowOverload(e.typerep, top.env))(e, top.location);
+    fromMaybe(showHost(_, location=_), getShowOverloadProd(e.typerep, top.env))(e, top.location);
   
   forwards to mkErrorCheck(localErrors, fwrd);
 }
@@ -135,7 +135,7 @@ top::Expr ::= e::Expr
   
   local localErrors::[Message] = e.errors;
   local fwrd::Expr =
-    fromMaybe(strHost(_, location=_), getStrOverload(e.typerep, top.env))(e, top.location);
+    fromMaybe(strHost(_, location=_), getStrOverloadProd(e.typerep, top.env))(e, top.location);
   
   forwards to mkErrorCheck(localErrors, fwrd);
 }
