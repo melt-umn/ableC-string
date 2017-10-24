@@ -152,7 +152,7 @@ function checkShowErrors
 [Message] ::= t::Type env::Decorated Env loc::Location
 {
   return
-    case orElse(t.showProd, getShowOverload(t, env)) of
+    case orElse(t.showProd, getShowOverloadProd(t, env)) of
       just(_) -> []
     | nothing() -> [err(loc, s"show of ${showType(t)} not defined")]
     end;
@@ -163,7 +163,7 @@ function checkStrErrors
 [Message] ::= t::Type env::Decorated Env loc::Location
 {
   return
-    case orElse(t.strProd, getStrOverload(t, env)) of
+    case orElse(t.strProd, getStrOverloadProd(t, env)) of
       just(_) -> []
     | nothing() -> [err(loc, s"str of ${showType(t)} not defined")]
     end;
