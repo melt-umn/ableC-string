@@ -1,9 +1,51 @@
 grammar edu:umn:cs:melt:exts:ableC:string:abstractsyntax;
 
-synthesized attribute showProd::Maybe<(Expr ::= Expr Location)> occurs on Type, BuiltinType;--, IntegerType, RealType;
-synthesized attribute pointerShowProd::Maybe<(Expr ::= Expr Location)> occurs on Type, BuiltinType;--, IntegerType, RealType;
-synthesized attribute strProd::Maybe<(Expr ::= Expr Location)> occurs on Type, BuiltinType;--, IntegerType, RealType;
-synthesized attribute pointerStrProd::Maybe<(Expr ::= Expr Location)> occurs on Type, BuiltinType;--, IntegerType, RealType;
+import edu:umn:cs:melt:ableC:abstractsyntax:overloadable;
+
+abstract production stringTypeExpr
+top::BaseTypeExpr ::= q::Qualifiers loc::Location
+{
+  propagate substituted;
+  forwards to
+    if !null(lookupRefId("edu:umn:cs:melt:exts:ableC:string:string", top.env))
+    then extTypeExpr(q, stringType())
+    else errorTypeExpr([err(loc, "Missing include of string.xh")]);
+}
+
+abstract production stringType
+top::ExtType ::=
+{
+  propagate substituted;
+  top.pp = pp"string";
+  top.host =
+    tagType(
+      top.givenQualifiers,
+      refIdTagType(structSEU(), "_string_s",
+      s"edu:umn:cs:melt:exts:ableC:string:string"));
+  top.mangledName = "string";
+  top.isEqualTo =
+    \ other::ExtType -> case other of stringType() -> true | _ -> false end;
+  
+  
+  top.lAddProd = just(appendString(_, _, location=_));
+  top.rAddProd = just(appendString(_, _, location=_));
+  top.lSubProd = just(removeString(_, _, location=_));
+  top.lMulProd = just(repeatString(_, _, location=_));
+  -- Overloads for +=, -=, *=, automatically inferred from above
+  top.lEqualsProd = just(equalsString(_, _, location=_));
+  top.rEqualsProd = just(equalsString(_, _, location=_));
+  -- Overload for != automatically inferred from above
+  top.arraySubscriptProd = just(subscriptString(_, _, location=_));
+  top.addressOfArraySubscriptProd =
+    just(\ Expr Expr loc::Location -> errorExpr([err(loc, "strings are immutable, cannot assign to index")], location=loc));
+  top.callMemberProd = just(callMemberString(_, _, _, _, location=_));
+  top.memberProd = just(memberString(_, _, _, location=_));
+}
+
+synthesized attribute showProd::Maybe<(Expr ::= Expr Location)> occurs on Type, BuiltinType, ExtType;
+synthesized attribute pointerShowProd::Maybe<(Expr ::= Expr Location)> occurs on Type, BuiltinType;
+synthesized attribute strProd::Maybe<(Expr ::= Expr Location)> occurs on Type, BuiltinType, ExtType;
+synthesized attribute pointerStrProd::Maybe<(Expr ::= Expr Location)> occurs on Type, BuiltinType;
 
 aspect default production
 top::Type ::=
@@ -12,51 +54,6 @@ top::Type ::=
   top.pointerShowProd = nothing();
   top.strProd = nothing();
   top.pointerStrProd = nothing();
-}
-
-aspect default production
-top::BuiltinType ::=
-{
-  top.showProd = nothing();
-  top.pointerShowProd = nothing();
-  top.strProd = nothing();
-  top.pointerStrProd = nothing();
-}
-{-
-aspect default production
-top::IntegerType ::=
-{
-  top.showProd = nothing();
-  top.pointerShowProd = nothing();
-  top.strProd = nothing();
-  top.pointerStrProd = nothing();
-}
-
-aspect default production
-top::RealType ::=
-{
-  top.showProd = nothing();
-  top.pointerShowProd = nothing();
-  top.strProd = nothing();
-  top.pointerStrProd = nothing();
-}
--}
-
-abstract production stringTypeExpr 
-top::BaseTypeExpr ::= q::Qualifiers
-{
-  propagate substituted;
-  forwards to directTypeExpr(stringType(q));
-}
-
-abstract production stringType
-top::Type ::= q::Qualifiers
-{
-  top.lpp = pp"string";
-  top.rpp = pp"";
-
-  forwards to
-    tagType(q, refIdTagType(structSEU(), "_string_s", s"edu:umn:cs:melt:exts:ableC:string:string"));
 }
 
 aspect production errorType
@@ -81,6 +78,15 @@ top::Type ::= quals::Qualifiers sub::Type
     end;
 }
 
+aspect default production
+top::BuiltinType ::=
+{
+  top.showProd = nothing();
+  top.pointerShowProd = nothing();
+  top.strProd = nothing();
+  top.pointerStrProd = nothing();
+}
+
 aspect production builtinType
 top::Type ::= quals::Qualifiers sub::BuiltinType
 {
@@ -100,7 +106,7 @@ top::BuiltinType ::= sub::RealType
 aspect production signedType
 top::BuiltinType ::= sub::IntegerType
 {
-  top.showProd = 
+  top.showProd =
     case sub of
       charType() -> just(showChar(_, location=_))
     | _ -> just(showInt(_, location=_))
@@ -110,7 +116,7 @@ top::BuiltinType ::= sub::IntegerType
       charType() -> just(showCharPointer(_, location=_))
     | _ -> nothing()
     end;
-  top.strProd = 
+  top.strProd =
     case sub of
       charType() -> just(strChar(_, location=_))
     | _ -> just(showInt(_, location=_))
@@ -125,7 +131,7 @@ top::BuiltinType ::= sub::IntegerType
 aspect production unsignedType
 top::BuiltinType ::= sub::IntegerType
 {
-  top.showProd = 
+  top.showProd =
     case sub of
       charType() -> just(showChar(_, location=_))
     | _ -> just(showInt(_, location=_))
@@ -135,7 +141,7 @@ top::BuiltinType ::= sub::IntegerType
       charType() -> just(showCharPointer(_, location=_))
     | _ -> nothing()
     end;
-  top.strProd = 
+  top.strProd =
     case sub of
       charType() -> just(strChar(_, location=_))
     | _ -> just(showInt(_, location=_))
@@ -147,24 +153,23 @@ top::BuiltinType ::= sub::IntegerType
     end;
 }
 
--- Check if errors result from in applying the show() operator to a type 
-function checkShowErrors
-[Message] ::= t::Type env::Decorated Env loc::Location
+aspect default production
+top::ExtType ::=
 {
-  return
-    case orElse(t.showProd, getShowOverloadProd(t, env)) of
-      just(_) -> []
-    | nothing() -> [err(loc, s"show of ${showType(t)} not defined")]
-    end;
+  top.showProd = nothing();
+  top.strProd = nothing();
 }
 
--- Check if errors result from in applying the str() operator to a type 
-function checkStrErrors
-[Message] ::= t::Type env::Decorated Env loc::Location
+aspect production extType
+top::Type ::= quals::Qualifiers sub::ExtType
 {
-  return
-    case orElse(t.strProd, getStrOverloadProd(t, env)) of
-      just(_) -> []
-    | nothing() -> [err(loc, s"str of ${showType(t)} not defined")]
-    end;
+  top.showProd = sub.showProd;
+  top.strProd = sub.strProd;
+}
+
+aspect production stringType
+top::ExtType ::=
+{
+  top.showProd = just(showString(_, location=_));
+  top.strProd = just(strString(_, location=_));
 }

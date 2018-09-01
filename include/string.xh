@@ -8,13 +8,12 @@
 #ifndef _STRING_XH
 #define _STRING_XH
 
-struct __attribute__((refId("edu:umn:cs:melt:exts:ableC:string:string"),
-                      module("edu:umn:cs:melt:exts:ableC:string:string"))) _string_s {
+struct __attribute__((refId("edu:umn:cs:melt:exts:ableC:string:string"))) _string_s {
   size_t length;
   const char *text;
 };
 
-// Functions prefixed with _ are considered internal to the implimentation of the extension
+// Functions prefixed with _ are considered internal to the implementation of the extension
 // Other functions are in theory OK to call directly
 static inline void _check_index_string(string s, size_t i) {
   if (i < 0 || i >= s.length) {
@@ -28,7 +27,7 @@ static inline char _index_string(string s, size_t i) {
   return s.text[i];
 }
 
-static inline bool _eq_string(string s1, string s2) {
+static inline bool _equals_string(string s1, string s2) {
   return !strcmp(s1.text, s2.text);
 }
 

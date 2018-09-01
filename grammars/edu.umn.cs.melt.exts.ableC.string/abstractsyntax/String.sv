@@ -10,137 +10,7 @@ imports edu:umn:cs:melt:ableC:abstractsyntax:substitution;
 imports edu:umn:cs:melt:ableC:abstractsyntax:overloadable as ovrld;
 --imports edu:umn:cs:melt:ableC:abstractsyntax:debug;
 
-global builtin::Location = builtinLoc("string");
-
-aspect function ovrld:getAddOverloadProd
-Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
-{
-  lOverloads <-
-    [pair(
-       "edu:umn:cs:melt:exts:ableC:string:string",
-       \ lhs::Expr rhs::Expr loc::Location ->
-         appendString(lhs, strExpr(rhs, location=loc), location=loc))];
-  rOverloads <-
-    [pair(
-       "edu:umn:cs:melt:exts:ableC:string:string",
-       \ lhs::Expr rhs::Expr loc::Location ->
-         appendString(strExpr(lhs, location=loc), rhs, location=loc))];
-}
-
-aspect function ovrld:getSubOverloadProd
-Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
-{
-  lOverloads <-
-    [pair(
-       "edu:umn:cs:melt:exts:ableC:string:string",
-       \ lhs::Expr rhs::Expr loc::Location ->
-         removeString(lhs, strExpr(rhs, location=loc), location=loc))];
-}
-
-aspect function ovrld:getMulOverloadProd
-Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
-{
-  lOverloads <- [pair("edu:umn:cs:melt:exts:ableC:string:string", repeatString(_, _, location=_))];
-}
-
-aspect function ovrld:getEqualsOverloadProd
-Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
-{
-  lOverloads <-
-    [pair(
-       "edu:umn:cs:melt:exts:ableC:string:string",
-       \ lhs::Expr rhs::Expr loc::Location ->
-         eqString(lhs, strExpr(rhs, location=loc), location=loc))];
-  rOverloads <-
-    [pair(
-       "edu:umn:cs:melt:exts:ableC:string:string",
-       \ lhs::Expr rhs::Expr loc::Location ->
-         eqString(strExpr(lhs, location=loc), rhs, location=loc))];
-}
-
-aspect function ovrld:getEqOverloadProd
-Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
-{
-  lOverloads <- [pair("edu:umn:cs:melt:exts:ableC:string:string", assignString(_, _, location=_))];
-}
-
-aspect function ovrld:getMemberCallOverloadProd
-Maybe<(Expr ::= Expr Boolean Name Exprs Location)> ::= t::Type env::Decorated Env
-{
-  overloads <-
-    [pair("edu:umn:cs:melt:exts:ableC:string:string", memberCallString(_, _, _, _, location=_))];
-}
-
-aspect function ovrld:getArraySubscriptOverloadProd
-Maybe<(Expr ::= Expr Expr Location)> ::= t::Type env::Decorated Env
-{
-  overloads <-
-    [pair("edu:umn:cs:melt:exts:ableC:string:string", subscriptString(_, _, location=_))];
-}
-
-aspect function ovrld:getSubscriptAssignOverloadProd
-Maybe<(Expr ::= Expr Expr (Expr ::= Expr Expr Location) Expr Location)> ::= t::Type env::Decorated Env
-{
-  overloads <-
-    [pair(
-       "edu:umn:cs:melt:exts:ableC:string:string",
-       \ l::Expr i::Expr o::(Expr ::= Expr Expr Location) r::Expr loc::Location ->
-         errorExpr([err(loc, "Strings are immutable, cannot assign to index")], location=loc))];
-}
-
-aspect function ovrld:getMemberAssignOverloadProd
-Maybe<(Expr ::= Expr Boolean Name (Expr ::= Expr Expr Location) Expr Location)> ::= t::Type env::Decorated Env
-{
-  overloads <-
-    [pair(
-       "edu:umn:cs:melt:exts:ableC:string:string",
-       \ l::Expr d::Boolean m::Name o::(Expr ::= Expr Expr Location) r::Expr loc::Location ->
-         errorExpr([err(loc, s"Cannot assign to field ${m.name} of string")], location=loc))];
-}
-
-function getShowOverloadProd
-Maybe<(Expr ::= Expr Location)> ::= t::Type env::Decorated Env
-{
-  production attribute overloads::[Pair<String (Expr ::= Expr Location)>] with ++;
-  overloads := [pair("edu:umn:cs:melt:exts:ableC:string:string", showString(_, location=_))];
-  return ovrld:getUnaryOverloadProd(t, env, overloads);
-}
-
-function getStrOverloadProd
-Maybe<(Expr ::= Expr Location)> ::= t::Type env::Decorated Env
-{
-  production attribute overloads::[Pair<String (Expr ::= Expr Location)>] with ++;
-  overloads := [pair("edu:umn:cs:melt:exts:ableC:string:string", strString(_, location=_))];
-  return ovrld:getUnaryOverloadProd(t, env, overloads);
-}
-
 abstract production showExpr
-top::Expr ::= e::Expr
-{
-  propagate substituted;
-  top.pp = pp"show(${e.pp})";
-  
-  local localErrors::[Message] = e.errors;
-  local fwrd::Expr =
-    fromMaybe(showHost(_, location=_), getShowOverloadProd(e.typerep, top.env))(e, top.location);
-  
-  forwards to mkErrorCheck(localErrors, fwrd);
-}
-
-abstract production strExpr
-top::Expr ::= e::Expr
-{
-  propagate substituted;
-  top.pp = pp"str(${e.pp})";
-  
-  local localErrors::[Message] = e.errors;
-  local fwrd::Expr =
-    fromMaybe(strHost(_, location=_), getStrOverloadProd(e.typerep, top.env))(e, top.location);
-  
-  forwards to mkErrorCheck(localErrors, fwrd);
-}
-
-abstract production showHost
 top::Expr ::= e::Expr
 {
   propagate substituted;
@@ -150,7 +20,7 @@ top::Expr ::= e::Expr
   local fwrd::Expr =
     case e.typerep.showProd of
       just(p) -> p(e, top.location)
-    | nothing() -> errorExpr([err(e.location, s"show of ${showType(e.typerep)} not defined")], location=top.location)
+    | nothing() -> errorExpr([err(e.location, s"show of ${showType(e.typerep)} not defined")], location=builtin)
     end;
   forwards to mkErrorCheck(localErrors, fwrd);
 }
@@ -162,6 +32,7 @@ top::Expr ::= e::Expr
   top.pp = pp"show(${e.pp})";
   
   local localErrors::[Message] =
+    checkStringType(e.typerep, "show", top.location) ++
     checkStringHeaderDef("showString", top.location, top.env);
   local fwrd::Expr =
     directCallExpr(
@@ -255,7 +126,7 @@ top::Expr ::= e::Expr
   forwards to mkErrorCheck(localErrors, fwrd);
 }
 
-abstract production strHost
+abstract production strExpr
 top::Expr ::= e::Expr
 {
   propagate substituted;
@@ -265,7 +136,7 @@ top::Expr ::= e::Expr
   local fwrd::Expr =
     case e.typerep.strProd of
       just(p) -> p(e, top.location)
-    | nothing() -> errorExpr([err(e.location, s"str of ${showType(e.typerep)} not defined")], location=top.location)
+    | nothing() -> errorExpr([err(e.location, s"str of ${showType(e.typerep)} not defined")], location=builtin)
     end;
   forwards to mkErrorCheck(localErrors, fwrd);
 }
@@ -388,9 +259,10 @@ top::Expr ::= e1::Expr e2::Expr
   
   local localErrors::[Message] =
     checkStringHeaderDef("_repeat_string", top.location, top.env) ++
+    checkStringType(e1.typerep, "*", top.location) ++
     if e2.typerep.isIntegerType
     then []
-    else [err(e2.location, s"String repeat must have integer type, but got ${showType(e2.typerep)}")];
+    else [err(e2.location, s"string repeat must have integer type, but got ${showType(e2.typerep)}")];
   local fwrd::Expr =
     directCallExpr(
       name("_repeat_string", location=builtin),
@@ -399,18 +271,22 @@ top::Expr ::= e1::Expr e2::Expr
   forwards to mkErrorCheck(localErrors, fwrd);
 }
 
-abstract production eqString
+abstract production equalsString
 top::Expr ::= e1::Expr e2::Expr
 {
   propagate substituted;
   top.pp = pp"${e1.pp} == ${e2.pp}";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("_eq_string", top.location, top.env);
+    checkStringHeaderDef("_equals_string", top.location, top.env);
   local fwrd::Expr =
     directCallExpr(
-      name("_eq_string", location=builtin),
-      consExpr(e1, consExpr(e2, nilExpr())),
+      name("_equals_string", location=builtin),
+      consExpr(
+        strExpr(e1, location=builtin),
+        consExpr(
+          strExpr(e2, location=builtin),
+          nilExpr())),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
 }
@@ -423,9 +299,10 @@ top::Expr ::= e1::Expr e2::Expr
   
   local localErrors::[Message] =
     checkStringHeaderDef("_index_string", top.location, top.env) ++
+    checkStringType(e1.typerep, "[]", top.location) ++
     if e2.typerep.isIntegerType
     then []
-    else [err(e2.location, s"String index must have integer type, but got ${showType(e2.typerep)}")];
+    else [err(e2.location, s"string index must have integer type, but got ${showType(e2.typerep)}")];
   local fwrd::Expr =
     directCallExpr(
       name("_index_string", location=builtin),
@@ -434,16 +311,45 @@ top::Expr ::= e1::Expr e2::Expr
   forwards to mkErrorCheck(localErrors, fwrd);
 }
 
-abstract production memberCallString
+abstract production callMemberString
 top::Expr ::= lhs::Expr deref::Boolean rhs::Name a::Exprs
 {
   propagate substituted;
   
   forwards to
-    case deref, rhs.name of
-      _, "substring" -> substringString(lhs, a, location=top.location)
-    | _, n -> errorExpr([err(rhs.location, s"String does not have field ${n}")], location=top.location)
+    case rhs.name of
+      "substring" -> substringString(lhs, a, location=top.location)
+    | n -> errorExpr([err(rhs.location, s"string does not have field ${n}")], location=builtin)
     end;
+}
+
+abstract production memberString
+top::Expr ::= lhs::Expr deref::Boolean rhs::Name
+{
+  propagate substituted;
+  top.pp = parens(ppConcat([lhs.pp, text(if deref then "->" else "."), rhs.pp]));
+
+  local localErrors::[Message] =
+    (if !null(lookupRefId("edu:umn:cs:melt:exts:ableC:string:string", top.env))
+     then []
+     else [err(top.location, "Missing include of string.xh")]) ++
+    checkStringType(lhs.typerep, ".", top.location) ++
+    (if rhs.name == "length" || rhs.name == "text"
+     then []
+     else [err(rhs.location, s"string does not have member ${rhs.name}")]);
+  local fwrd::Expr =
+    memberExpr(
+      explicitCastExpr(
+        typeName(
+          tagReferenceTypeExpr(
+            consQualifier(constQualifier(location=builtin), nilQualifier()), structSEU(),
+            name("_string_s", location=builtin)),
+          baseTypeExpr()),
+        lhs,
+        location=builtin),
+      false, rhs,
+      location=builtin);
+  forwards to mkErrorCheck(localErrors, fwrd);
 }
 
 abstract production substringString
@@ -460,6 +366,7 @@ top::Expr ::= e1::Expr a::Exprs
   a.callVariadic = false;
   local localErrors::[Message] =
     checkStringHeaderDef("_substring", top.location, top.env) ++
+    checkStringType(e1.typerep, "substring", top.location) ++
     a.argumentErrors;
   local fwrd::Expr =
     directCallExpr(
@@ -478,3 +385,15 @@ function checkStringHeaderDef
     then []
     else [err(loc, "Missing include of string.xh")];
 }
+
+-- Check that operand has string type
+function checkStringType
+[Message] ::= t::Type op::String loc::Location
+{
+  return
+    if typeAssignableTo(extType(nilQualifier(), stringType()), t)
+    then []
+    else [err(loc, s"Operand to ${op} expected string type (got ${showType(t)})")];
+}
+
+global builtin::Location = builtinLoc("string");
