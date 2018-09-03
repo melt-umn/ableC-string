@@ -33,10 +33,10 @@ top::Expr ::= e::Expr
   
   local localErrors::[Message] =
     checkStringType(e.typerep, "show", top.location) ++
-    checkStringHeaderDef("showString", top.location, top.env);
+    checkStringHeaderDef("show_string", top.location, top.env);
   local fwrd::Expr =
     directCallExpr(
-      name("showString", location=builtin),
+      name("show_string", location=builtin),
       consExpr(e, nilExpr()),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -49,10 +49,10 @@ top::Expr ::= e::Expr
   top.pp = pp"show(${e.pp})";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("showCharPointer", top.location, top.env);
+    checkStringHeaderDef("show_char_pointer", top.location, top.env);
   local fwrd::Expr =
     directCallExpr(
-      name("showCharPointer", location=builtin),
+      name("show_char_pointer", location=builtin),
       consExpr(e, nilExpr()),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -65,10 +65,10 @@ top::Expr ::= e::Expr
   top.pp = pp"show(${e.pp})";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("showChar", top.location, top.env);
+    checkStringHeaderDef("show_char", top.location, top.env);
   local fwrd::Expr =
     directCallExpr(
-      name("showChar", location=builtin),
+      name("show_char", location=builtin),
       consExpr(e, nilExpr()),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -81,10 +81,10 @@ top::Expr ::= e::Expr
   top.pp = pp"show(${e.pp})";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("showInt", top.location, top.env);
+    checkStringHeaderDef("show_int", top.location, top.env);
   local fwrd::Expr =
     directCallExpr(
-      name("showInt", location=builtin),
+      name("show_int", location=builtin),
       consExpr(e, nilExpr()),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -97,10 +97,10 @@ top::Expr ::= e::Expr
   top.pp = pp"show(${e.pp})";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("showFloat", top.location, top.env);
+    checkStringHeaderDef("show_float", top.location, top.env);
   local fwrd::Expr =
     directCallExpr(
-      name("showFloat", location=builtin),
+      name("show_float", location=builtin),
       consExpr(e, nilExpr()),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -113,10 +113,10 @@ top::Expr ::= e::Expr
   top.pp = pp"show(${e.pp})";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("_showPointer", top.location, top.env);
+    checkStringHeaderDef("_show_pointer", top.location, top.env);
   local fwrd::Expr =
     directCallExpr(
-      name("_showPointer", location=builtin),
+      name("_show_pointer", location=builtin),
       consExpr(
         stringLiteral(s"\"${showType(e.typerep)}\"", location=builtin),
         consExpr(
@@ -157,10 +157,10 @@ top::Expr ::= e::Expr
   top.pp = pp"str(${e.pp})";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("strCharPointer", top.location, top.env);
+    checkStringHeaderDef("str_char_pointer", top.location, top.env);
   local fwrd::Expr =
     directCallExpr(
-      name("strCharPointer", location=builtin),
+      name("str_char_pointer", location=builtin),
       consExpr(e, nilExpr()),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -173,10 +173,10 @@ top::Expr ::= e::Expr
   top.pp = pp"str(${e.pp})";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("strChar", top.location, top.env);
+    checkStringHeaderDef("str_char", top.location, top.env);
   local fwrd::Expr =
     directCallExpr(
-      name("strChar", location=builtin),
+      name("str_char", location=builtin),
       consExpr(e, nilExpr()),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -189,10 +189,10 @@ top::Expr ::= e::Expr
   top.pp = pp"str(${e.pp})";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("strPointer", top.location, top.env);
+    checkStringHeaderDef("str_pointer", top.location, top.env);
   local fwrd::Expr =
     directCallExpr(
-      name("strPointer", location=builtin),
+      name("str_pointer", location=builtin),
       consExpr(e, nilExpr()),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -211,17 +211,17 @@ top::Expr ::= lhs::Expr rhs::Expr
       location=builtin);
 }
 
-abstract production appendString
+abstract production concatString
 top::Expr ::= e1::Expr e2::Expr
 {
   propagate substituted;
   top.pp = pp"${e1.pp} + ${e2.pp}";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("_append_string", top.location, top.env);
+    checkStringHeaderDef("concat_string", top.location, top.env);
   local fwrd::Expr =
     directCallExpr(
-      name("_append_string", location=builtin),
+      name("concat_string", location=builtin),
       consExpr(
         strExpr(e1, location=builtin),
         consExpr(
@@ -238,10 +238,10 @@ top::Expr ::= e1::Expr e2::Expr
   top.pp = pp"${e1.pp} - ${e2.pp}";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("_remove_string", top.location, top.env);
+    checkStringHeaderDef("remove_string", top.location, top.env);
   local fwrd::Expr =
     directCallExpr(
-      name("_remove_string", location=builtin),
+      name("remove_string", location=builtin),
       consExpr(
         strExpr(e1, location=builtin),
         consExpr(
@@ -258,14 +258,14 @@ top::Expr ::= e1::Expr e2::Expr
   top.pp = pp"${e1.pp} * ${e2.pp}";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("_repeat_string", top.location, top.env) ++
+    checkStringHeaderDef("repeat_string", top.location, top.env) ++
     checkStringType(e1.typerep, "*", top.location) ++
     if e2.typerep.isIntegerType
     then []
     else [err(e2.location, s"string repeat must have integer type, but got ${showType(e2.typerep)}")];
   local fwrd::Expr =
     directCallExpr(
-      name("_repeat_string", location=builtin),
+      name("repeat_string", location=builtin),
       consExpr(e1, consExpr(e2, nilExpr())),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -278,10 +278,10 @@ top::Expr ::= e1::Expr e2::Expr
   top.pp = pp"${e1.pp} == ${e2.pp}";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("_equals_string", top.location, top.env);
+    checkStringHeaderDef("equals_string", top.location, top.env);
   local fwrd::Expr =
     directCallExpr(
-      name("_equals_string", location=builtin),
+      name("equals_string", location=builtin),
       consExpr(
         strExpr(e1, location=builtin),
         consExpr(
@@ -298,14 +298,14 @@ top::Expr ::= e1::Expr e2::Expr
   top.pp = pp"${e1.pp}[${e2.pp}]";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("_index_string", top.location, top.env) ++
+    checkStringHeaderDef("subscript_string", top.location, top.env) ++
     checkStringType(e1.typerep, "[]", top.location) ++
     if e2.typerep.isIntegerType
     then []
     else [err(e2.location, s"string index must have integer type, but got ${showType(e2.typerep)}")];
   local fwrd::Expr =
     directCallExpr(
-      name("_index_string", location=builtin),
+      name("subscript_string", location=builtin),
       consExpr(e1, consExpr(e2, nilExpr())),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -365,12 +365,12 @@ top::Expr ::= e1::Expr a::Exprs
   a.callExpr = top; -- Doesn't really matter, just needs location
   a.callVariadic = false;
   local localErrors::[Message] =
-    checkStringHeaderDef("_substring", top.location, top.env) ++
+    checkStringHeaderDef("substring", top.location, top.env) ++
     checkStringType(e1.typerep, "substring", top.location) ++
     a.argumentErrors;
   local fwrd::Expr =
     directCallExpr(
-      name("_substring", location=builtin),
+      name("substring", location=builtin),
       consExpr(e1, a),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);

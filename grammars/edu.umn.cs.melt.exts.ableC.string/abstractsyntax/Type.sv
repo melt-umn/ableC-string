@@ -26,9 +26,9 @@ top::ExtType ::=
   top.isEqualTo =
     \ other::ExtType -> case other of stringType() -> true | _ -> false end;
   
-  
-  top.lAddProd = just(appendString(_, _, location=_));
-  top.rAddProd = just(appendString(_, _, location=_));
+  top.lEqProd = just(assignString(_, _, location=_));
+  top.lAddProd = just(concatString(_, _, location=_));
+  top.rAddProd = just(concatString(_, _, location=_));
   top.lSubProd = just(removeString(_, _, location=_));
   top.lMulProd = just(repeatString(_, _, location=_));
   -- Overloads for +=, -=, *=, automatically inferred from above

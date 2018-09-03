@@ -4,7 +4,8 @@
 #include <stdlib.h>
 
 int main(int argc, char **argv) {
-  string a = str("abc");
+  string a;
+  a = "abc";
   printf("a: %s\n", a.text);
 
   if (a != "abc")
