@@ -18,9 +18,9 @@ top::ExtType ::=
   propagate substituted;
   top.pp = pp"string";
   top.host =
-    tagType(
+    extType(
       top.givenQualifiers,
-      refIdTagType(structSEU(), "_string_s",
+      refIdExtType(structSEU(), "_string_s",
       s"edu:umn:cs:melt:exts:ableC:string:string"));
   top.mangledName = "string";
   top.isEqualTo =
@@ -36,6 +36,7 @@ top::ExtType ::=
   top.rEqualsProd = just(equalsString(_, _, location=_));
   -- Overload for != automatically inferred from above
   top.arraySubscriptProd = just(subscriptString(_, _, location=_));
+  -- Better error message than default one about not being an lvalue
   top.addressOfArraySubscriptProd =
     just(\ Expr Expr loc::Location -> errorExpr([err(loc, "strings are immutable, cannot assign to index")], location=loc));
   top.callMemberProd = just(callMemberString(_, _, _, _, location=_));
