@@ -1,5 +1,4 @@
 #include <string.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -27,7 +26,7 @@ static inline char subscript_string(string s, size_t i) {
   return s.text[i];
 }
 
-static inline bool equals_string(string s1, string s2) {
+static inline _Bool equals_string(string s1, string s2) {
   return !strcmp(s1.text, s2.text);
 }
 
