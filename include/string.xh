@@ -1,5 +1,4 @@
 #include <string.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -8,13 +7,12 @@
 #ifndef _STRING_XH
 #define _STRING_XH
 
-struct __attribute__((refId("edu:umn:cs:melt:exts:ableC:string:string"),
-                      module("edu:umn:cs:melt:exts:ableC:string:string"))) _string_s {
+struct __attribute__((refId("edu:umn:cs:melt:exts:ableC:string:string"))) _string_s {
   size_t length;
   const char *text;
 };
 
-// Functions prefixed with _ are considered internal to the implimentation of the extension
+// Functions prefixed with _ are considered internal to the implementation of the extension
 // Other functions are in theory OK to call directly
 static inline void _check_index_string(string s, size_t i) {
   if (i < 0 || i >= s.length) {
@@ -23,23 +21,23 @@ static inline void _check_index_string(string s, size_t i) {
   }
 }
 
-static inline char _index_string(string s, size_t i) {
+static inline char subscript_string(string s, size_t i) {
   _check_index_string(s, i);
   return s.text[i];
 }
 
-static inline bool _eq_string(string s1, string s2) {
+static inline _Bool equals_string(string s1, string s2) {
   return !strcmp(s1.text, s2.text);
 }
 
-static inline string _append_string(string s1, string s2) {
-  char *result = GC_malloc(s1.length + s2.length + 1);
+static inline string concat_string(string s1, string s2) {
+  char *result = GC_malloc(s1.length + s2.length + 1); // + 1 for NULL char
   strcpy(result, s1.text);
   strcat(result, s2.text);
   return (string){s1.length + s2.length, result};
 }
 
-static inline string _repeat_string(string s, size_t num) {
+static inline string repeat_string(string s, size_t num) {
   char *result = GC_malloc(s.length * num + 1);
   result[0] = '\0';
   size_t i;
@@ -48,7 +46,7 @@ static inline string _repeat_string(string s, size_t num) {
   return (string){s.length * num, result};
 }
 
-static inline string _remove_string(string s1, string s2) {
+static inline string remove_string(string s1, string s2) {
   size_t i, j;
   char *result = GC_malloc(s1.length + 1);
   for (i = 0, j = 0; i < s1.length; i++) {
@@ -65,7 +63,7 @@ static inline string _remove_string(string s1, string s2) {
   return (string){j, result};
 }
 
-static inline string _substring(string s, size_t start, size_t end) {
+static inline string substring(string s, size_t start, size_t end) {
   if (start < 0 || start >= s.length || end < 0 || end >= s.length || start > end) {
     fprintf(stderr, "Substring index out of bounds: length %lu, start %lu, end %lu\n", s.length, start, end);
     exit(1);
@@ -75,27 +73,27 @@ static inline string _substring(string s, size_t start, size_t end) {
   return (string){end - start, result};
 }
 
-static inline string strCharPointer(char *s) {
+static inline string str_char_pointer(char *s) {
   size_t len = strlen(s);
   char *result = GC_malloc(len + 1);
   strcpy(result, s);
   return (string){len, result};
 }
 
-static inline string strChar(char c) {
+static inline string str_char(char c) {
   char *result = GC_malloc(2);
   result[0] = c;
   result[1] = '\0';
   return (string){1, result};
 }
 
-static inline string strPointer(void *ptr) {
+static inline string str_pointer(void *ptr) {
   char *result = GC_malloc(9);
   sprintf(result, "%lx", (unsigned long)ptr);
   return (string){strlen(result), result};
 }
 
-static inline string showString(string s) {
+static inline string show_string(string s) {
   char *result = GC_malloc(2 * s.length + 3); // Worst-case size, if all chars are escaped
   result[0] = '\"';
   size_t resultIndex = 1;
@@ -143,29 +141,29 @@ static inline string showString(string s) {
   return (string){resultIndex, result};
 }
 
-static inline string showCharPointer(char *s) {
-  return showString(strCharPointer(s));
+static inline string show_char_pointer(char *s) {
+  return show_string(str_char_pointer(s));
 }
 
-static inline string showInt(int i) {
+static inline string show_int(int i) {
   char *result = GC_malloc((CHAR_BIT * sizeof(i) - 1) / 3 + 2);
   sprintf(result, "%d", i);
   return (string){strlen(result), result};
 }
 
-static inline string showFloat(double f) {
+static inline string show_float(double f) {
   char *result = GC_malloc((CHAR_BIT * sizeof(f) - 1) / 3 + 2);
   sprintf((char*)result, "%g", f);
   return (string){strlen(result), result};
 }
 
-static inline string showChar(char c) {
+static inline string show_char(char c) {
   char *result = GC_malloc(4);
   sprintf((char*)result, "'%c'", c);
   return (string){strlen(result), result};
 }
 
-static inline string _showPointer(const char *baseTypeName, void *ptr) {
+static inline string _show_pointer(const char *baseTypeName, void *ptr) {
   char *result = GC_malloc(strlen(baseTypeName) + 17);
   sprintf(result, "<%s at 0x%lx>", baseTypeName, (unsigned long)ptr);
   return (string){strlen(result), result};
