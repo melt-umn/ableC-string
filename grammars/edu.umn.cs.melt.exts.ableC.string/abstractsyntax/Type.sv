@@ -6,6 +6,7 @@ abstract production stringTypeExpr
 top::BaseTypeExpr ::= q::Qualifiers loc::Location
 {
   propagate substituted;
+  top.pp = pp"string";
   forwards to
     if !null(lookupRefId("edu:umn:cs:melt:exts:ableC:string:string", top.env))
     then extTypeExpr(q, stringType())
