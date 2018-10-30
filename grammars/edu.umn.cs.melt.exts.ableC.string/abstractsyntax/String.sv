@@ -20,7 +20,7 @@ top::Expr ::= e::Expr
   
   local localErrors::[Message] = e.errors;
   local fwrd::Expr =
-    case e.typerep.showProd of
+    case e.typerep.defaultFunctionArrayLvalueConversion.showProd of
       just(p) -> p(e, top.location)
     | nothing() -> errorExpr([err(e.location, s"show of ${showType(e.typerep)} not defined")], location=builtin)
     end;
@@ -142,7 +142,7 @@ top::Expr ::= e::Expr
   
   local localErrors::[Message] = e.errors;
   local fwrd::Expr =
-    case e.typerep.strProd of
+    case e.typerep.defaultFunctionArrayLvalueConversion.strProd of
       just(p) -> p(e, top.location)
     | nothing() -> errorExpr([err(e.location, s"str of ${showType(e.typerep)} not defined")], location=builtin)
     end;
