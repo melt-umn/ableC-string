@@ -14,5 +14,5 @@ marking terminal Str_t 'str' lexer classes {Ckeyword};
 
 -- Someday, we may overload function application instead
 concrete productions top::PrimaryExpr_c
-| 'str' '(' s::Expr_c ')'
+| 'str' LParen_t s::Expr_c ')'
   { top.ast = strExpr(s.ast, location=top.location); }

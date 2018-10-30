@@ -82,19 +82,33 @@ int main(int argc, char **argv) {
   string m = show(show("abcd\n\n\\"));
   printf("m: %s\n", m.text);
   if (m != "\"\\\"abcd\\\\n\\\\n\\\\\\\\\\\"\"")
-   return 14;
+    return 14;
 
-  int x;
+  int x = 12;
   int *y = &x;
+  int *z = (int *)0x42;
   
   string n = show(y);
   printf("n: %s\n", n.text);
+  if (n != "&12")
+    return 15;
+  
   string o = str(y);
   printf("o: %s\n", o.text);
   string p = show(&y);
   printf("p: %s\n", p.text);
+  if (p != "&&12")
+    return 16;
+  
   string q = str(&y);
   printf("q: %s\n", q.text);
+  string r = show(z);
+  printf("r: %s\n", r.text);
+  if (r != "<signed int *  at 0x42>")
+    return 17;
+  
+  string s = str(z);
+  printf("s: %s\n", s.text);
 
   return 0;
 }

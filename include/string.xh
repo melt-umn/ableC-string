@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <setjmp.h>
+#include <signal.h>
 #include <gc.h>
 
 #ifndef _STRING_XH
@@ -163,10 +165,35 @@ static inline string show_char(char c) {
   return (string){strlen(result), result};
 }
 
-static inline string _show_pointer(const char *baseTypeName, void *ptr) {
-  char *result = GC_malloc(strlen(baseTypeName) + 17);
-  sprintf(result, "<%s at 0x%lx>", baseTypeName, (unsigned long)ptr);
-  return (string){strlen(result), result};
+// Hacky way of testing if a pointer can be dereferenced validly
+// TODO: This isn't remotely thread safe, but I don't know of a better way
+static jmp_buf _jump;
+static void _handle_segv(int sig) {
+  longjmp(_jump, 1);
+}
+template<a>
+string _show_pointer(const char *baseTypeName, a *ptr) {
+  _Bool illegal = 0;
+  a val;
+  
+  signal(SIGSEGV, _handle_segv);
+  if (!setjmp(_jump)) {
+    val = *ptr;
+  } else {
+    illegal = 1;
+  }
+  signal(SIGSEGV, SIG_DFL);
+
+  string result;
+  if (!illegal) {
+    result = "&" + show(val);
+  } else {
+    char *text = GC_malloc(strlen(baseTypeName) + 17);
+    sprintf(text, "<%s at 0x%lx>", baseTypeName, (unsigned long)ptr);
+    result = (string){strlen(text), text};
+  }
+
+  return result;
 }
 
 #endif

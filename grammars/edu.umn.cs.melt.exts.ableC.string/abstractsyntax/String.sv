@@ -10,6 +10,8 @@ imports edu:umn:cs:melt:ableC:abstractsyntax:substitution;
 imports edu:umn:cs:melt:ableC:abstractsyntax:overloadable as ovrld;
 --imports edu:umn:cs:melt:ableC:abstractsyntax:debug;
 
+imports edu:umn:cs:melt:exts:ableC:templating:abstractsyntax;
+
 abstract production showExpr
 top::Expr ::= e::Expr
 {
@@ -112,11 +114,17 @@ top::Expr ::= e::Expr
   propagate substituted;
   top.pp = pp"show(${e.pp})";
   
+  local subType::Type =
+    case e.typerep of
+    | pointerType(_, t) -> t
+    | _ -> errorType()
+    end;
   local localErrors::[Message] =
-    checkStringHeaderDef("_show_pointer", top.location, top.env);
+    checkStringHeaderDef("_handle_segv", top.location, top.env);
   local fwrd::Expr =
-    directCallExpr(
+    templateDirectCallExpr(
       name("_show_pointer", location=builtin),
+      consTypeName(typeName(directTypeExpr(subType), baseTypeExpr()), nilTypeName()),
       consExpr(
         stringLiteral(s"\"${showType(e.typerep)}\"", location=builtin),
         consExpr(

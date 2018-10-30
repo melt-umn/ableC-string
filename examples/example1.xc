@@ -85,8 +85,9 @@ int main(int argc, char **argv) {
   if (m != "\"\\\"abcd\\\\n\\\\n\\\\\\\\\\\"\"")
    return 14;
 
-  int x;
+  int x = 12;
   int *y = &x;
+  int *z = (int *)0x42;
   
   string n = show(y);
   printf("n: %s\n", n.text);
@@ -96,6 +97,10 @@ int main(int argc, char **argv) {
   printf("p: %s\n", p.text);
   string q = str(&y);
   printf("q: %s\n", q.text);
+  string r = show(z);
+  printf("r: %s\n", r.text);
+  string s = str(z);
+  printf("s: %s\n", s.text);
 
   return 0;
 }
