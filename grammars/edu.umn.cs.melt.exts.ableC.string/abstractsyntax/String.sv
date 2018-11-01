@@ -122,15 +122,28 @@ top::Expr ::= e::Expr
   local localErrors::[Message] =
     checkStringHeaderDef("_handle_segv", top.location, top.env);
   local fwrd::Expr =
-    templateDirectCallExpr(
-      name("_show_pointer", location=builtin),
-      consTypeName(typeName(directTypeExpr(subType), baseTypeExpr()), nilTypeName()),
-      consExpr(
-        stringLiteral(s"\"${showType(e.typerep)}\"", location=builtin),
-        consExpr(
-          e,
-          nilExpr())),
-      location=builtin);
+    ableC_Expr {
+      ({$directTypeExpr{e.typerep} _ptr = $Expr{e};
+        $directTypeExpr{subType} _val;
+        _Bool _illegal = 0;
+        
+        // Hacky way of testing if a pointer can be dereferenced validly
+        // TODO: This isn't remotely thread safe, but I don't know of a better way
+        _set_segv_handler();
+        if (!setjmp(_jump)) {
+          _val = *_ptr;
+        } else {
+          _illegal = 1;
+        }
+        _clear_segv_handler();
+        
+        !_illegal?
+          "&" + $Expr{showExpr(ableC_Expr{ _val }, location=builtin)} :
+          ({char *_baseTypeName = $stringLiteralExpr{showType(e.typerep)};
+            char *_text = GC_malloc(strlen(_baseTypeName) + 17);
+            sprintf(_text, "<%s at 0x%lx>", _baseTypeName, (unsigned long)_ptr);
+            ($directTypeExpr{extType(nilQualifier(), stringType())}){strlen(_text), _text};});})
+    };
   forwards to mkErrorCheck(localErrors, fwrd);
 }
 
@@ -346,17 +359,9 @@ top::Expr ::= lhs::Expr deref::Boolean rhs::Name
      then []
      else [err(rhs.location, s"string does not have member ${rhs.name}")]);
   local fwrd::Expr =
-    memberExpr(
-      explicitCastExpr(
-        typeName(
-          tagReferenceTypeExpr(
-            consQualifier(constQualifier(location=builtin), nilQualifier()), structSEU(),
-            name("_string_s", location=builtin)),
-          baseTypeExpr()),
-        lhs,
-        location=builtin),
-      false, rhs,
-      location=builtin);
+    ableC_Expr {
+      ((const struct _string_s)$Expr{lhs}).$Name{rhs}
+    };
   forwards to mkErrorCheck(localErrors, fwrd);
 }
 

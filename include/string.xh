@@ -171,29 +171,11 @@ static jmp_buf _jump;
 static void _handle_segv(int sig) {
   longjmp(_jump, 1);
 }
-template<a>
-string _show_pointer(const char *baseTypeName, a *ptr) {
-  _Bool illegal = 0;
-  a val;
-  
+static inline void _set_segv_handler() {
   signal(SIGSEGV, _handle_segv);
-  if (!setjmp(_jump)) {
-    val = *ptr;
-  } else {
-    illegal = 1;
-  }
+}
+static inline void _clear_segv_handler() {
   signal(SIGSEGV, SIG_DFL);
-
-  string result;
-  if (!illegal) {
-    result = "&" + show(val);
-  } else {
-    char *text = GC_malloc(strlen(baseTypeName) + 17);
-    sprintf(text, "<%s at 0x%lx>", baseTypeName, (unsigned long)ptr);
-    result = (string){strlen(text), text};
-  }
-
-  return result;
 }
 
 #endif
