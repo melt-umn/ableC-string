@@ -10,8 +10,6 @@ imports edu:umn:cs:melt:ableC:abstractsyntax:substitution;
 imports edu:umn:cs:melt:ableC:abstractsyntax:overloadable as ovrld;
 --imports edu:umn:cs:melt:ableC:abstractsyntax:debug;
 
-imports edu:umn:cs:melt:exts:ableC:templating:abstractsyntax;
-
 abstract production showExpr
 top::Expr ::= e::Expr
 {
