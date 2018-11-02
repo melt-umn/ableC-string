@@ -118,6 +118,7 @@ top::Expr ::= e::Expr
     | _ -> errorType()
     end;
   local localErrors::[Message] =
+    e.errors ++
     checkStringHeaderDef("_handle_segv", top.location, top.env) ++
     case subType.showProd of
     | just(_) -> []
