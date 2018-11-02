@@ -118,7 +118,12 @@ top::Expr ::= e::Expr
     | _ -> errorType()
     end;
   local localErrors::[Message] =
-    checkStringHeaderDef("_handle_segv", top.location, top.env);
+    checkStringHeaderDef("_handle_segv", top.location, top.env) ++
+    case subType.showProd of
+    | just(_) -> []
+    | nothing() ->
+      [err(e.location, s"Cannot show type ${showType(e.typerep)} because show of ${showType(subType)} is not defined.")]
+    end;
   local fwrd::Expr =
     ableC_Expr {
       ({$directTypeExpr{e.typerep} _ptr = $Expr{e};
