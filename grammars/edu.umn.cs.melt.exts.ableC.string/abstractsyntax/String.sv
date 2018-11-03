@@ -128,7 +128,7 @@ top::Expr ::= e::Expr
   local fwrd::Expr =
     ableC_Expr {
       ({$directTypeExpr{e.typerep} _ptr = $Expr{e};
-        $directTypeExpr{subType} _val;
+        $directTypeExpr{subType.withoutTypeQualifiers} _val;
         _Bool _illegal = 0;
         
         // Hacky way of testing if a pointer can be dereferenced validly
