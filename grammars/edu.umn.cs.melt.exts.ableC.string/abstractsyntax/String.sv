@@ -119,12 +119,7 @@ top::Expr ::= e::Expr
     end;
   local localErrors::[Message] =
     e.errors ++
-    checkStringHeaderDef("_handle_segv", top.location, top.env) ++
-    case subType.showProd of
-    | just(_) -> []
-    | nothing() ->
-      [err(e.location, s"Cannot show type ${showType(e.typerep)} because show of ${showType(subType)} is not defined.")]
-    end;
+    checkStringHeaderDef("_handle_segv", top.location, top.env);
   local fwrd::Expr =
     ableC_Expr {
       ({$directTypeExpr{e.typerep} _ptr = $Expr{e};
@@ -142,7 +137,11 @@ top::Expr ::= e::Expr
         _clear_segv_handler();
         
         !_illegal?
-          "&" + $Expr{showExpr(ableC_Expr{ _val }, location=builtin)} :
+          "&" + $Expr{
+            -- Preserve locations for error checking
+            showExpr(
+              declRefExpr(name("_val", location=builtin), location=e.location),
+              location=top.location)} :
           ({char *_baseTypeName = $stringLiteralExpr{showType(e.typerep)};
             char *_text = GC_malloc(strlen(_baseTypeName) + 17);
             sprintf(_text, "<%s at 0x%lx>", _baseTypeName, (unsigned long)_ptr);
