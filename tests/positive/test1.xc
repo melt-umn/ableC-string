@@ -3,6 +3,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+enum foo {
+  A, B, C
+};
+
 int main(int argc, char **argv) {
   string a = str("abc");
   printf("a: %s\n", a.text);
@@ -109,6 +113,27 @@ int main(int argc, char **argv) {
   
   string s = str(z);
   printf("s: %s\n", s.text);
+
+  string t = str(A);
+  printf("t: %s\n", t.text);
+  if (t != "0")
+    return 18;
+
+  string u = show(B);
+  printf("u: %s\n", u.text);
+  if (u != "B")
+    return 19;
+
+  string v = show((enum foo)42);
+  printf("v: %s\n", v.text);
+  if (v != "<enum foo 42>")
+    return 20;
+
+  enum foo foo_C = C;
+  string w = show(&foo_C);
+  printf("w: %s\n", w.text);
+  if (w != "&C")
+    return 21;
 
   return 0;
 }

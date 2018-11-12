@@ -175,3 +175,10 @@ top::ExtType ::=
   top.showProd = just(showString(_, location=_));
   top.strProd = just(strString(_, location=_));
 }
+
+aspect production enumExtType
+top::ExtType ::= ref::Decorated EnumDecl
+{
+  top.showProd = just(showEnum(_, location=_));
+  top.strProd = just(showInt(_, location=_));
+}

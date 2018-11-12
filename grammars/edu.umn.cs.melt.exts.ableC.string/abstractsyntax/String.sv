@@ -106,6 +106,63 @@ top::Expr ::= e::Expr
   forwards to mkErrorCheck(localErrors, fwrd);
 }
 
+abstract production showEnum
+top::Expr ::= e::Expr
+{
+  propagate substituted;
+  top.pp = pp"show(${e.pp})";
+  
+  local decl::Decorated EnumDecl =
+    case e.typerep of
+    | extType(_, enumExtType(decl)) -> decl
+    end;
+  
+  local localErrors::[Message] =
+    checkStringHeaderDef("str_char_pointer", top.location, top.env) ++
+    case e.typerep of
+    | extType(_, enumExtType(_)) -> []
+    | _ -> [err(e.location, s"Expected an enum type (got ${showType(e.typerep)})")]
+    end;
+  local fwrd::Expr =
+    ableC_Expr {
+      ({$directTypeExpr{e.typerep} _enum_val = $Expr{e};
+        $Expr{decl.enumShowTransform};})
+    };
+  forwards to mkErrorCheck(localErrors, fwrd);
+}
+
+synthesized attribute enumShowTransform::Expr occurs on EnumDecl, EnumItemList;
+
+aspect production enumDecl
+top::EnumDecl ::= name::MaybeName  dcls::EnumItemList
+{
+  top.enumShowTransform = dcls.enumShowTransform;
+}
+
+aspect production consEnumItem
+top::EnumItemList ::= h::EnumItem  t::EnumItemList
+{
+  top.enumShowTransform =
+    ableC_Expr {
+      _enum_val == $name{h.name}?
+        $Expr{strExpr(mkStringConst(h.name, builtin), location=builtin)} :
+        $Expr{t.enumShowTransform}
+    };
+}
+
+aspect production nilEnumItem
+top::EnumItemList ::=
+{
+  top.enumShowTransform =
+    ableC_Expr {
+      "<" +
+      ($stringLiteralExpr{showType(top.containingEnum)} +
+       (" " +
+        ($Expr{strExpr(ableC_Expr {(unsigned)_enum_val}, location=builtin)} +
+         ">")))
+    };
+}
+
 abstract production showPointer
 top::Expr ::= e::Expr
 {
@@ -123,14 +180,14 @@ top::Expr ::= e::Expr
   local fwrd::Expr =
     ableC_Expr {
       ({$directTypeExpr{e.typerep} _ptr = $Expr{e};
-        $directTypeExpr{subType.withoutTypeQualifiers} _val;
+        $directTypeExpr{subType.withoutTypeQualifiers} _ptr_val;
         _Bool _illegal = 0;
         
         // Hacky way of testing if a pointer can be dereferenced validly
         // TODO: This isn't remotely thread safe, but I don't know of a better way
         _set_segv_handler();
         if (!setjmp(_jump)) {
-          _val = *_ptr;
+          _ptr_val = *_ptr;
         } else {
           _illegal = 1;
         }
@@ -140,7 +197,7 @@ top::Expr ::= e::Expr
           "&" + $Expr{
             -- Preserve locations for error checking
             showExpr(
-              declRefExpr(name("_val", location=builtin), location=e.location),
+              declRefExpr(name("_ptr_val", location=builtin), location=e.location),
               location=top.location)} :
           ({char *_baseTypeName = $stringLiteralExpr{showType(e.typerep)};
             char *_text = GC_malloc(strlen(_baseTypeName) + 17);
