@@ -16,7 +16,7 @@ top::BaseTypeExpr ::= q::Qualifiers loc::Location
 abstract production stringType
 top::ExtType ::=
 {
-  propagate substituted;
+  propagate substituted, canonicalType;
   top.pp = pp"string";
   top.host =
     extType(
