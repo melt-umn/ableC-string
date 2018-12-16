@@ -19,7 +19,7 @@ top::Expr ::= e::Expr
   local localErrors::[Message] = e.errors;
   local fwrd::Expr =
     case e.typerep.defaultFunctionArrayLvalueConversion.showProd of
-      just(p) -> p(e, top.location)
+      just(p) -> p(decExpr(e, location=e.location), top.location)
     | nothing() -> errorExpr([err(e.location, s"show of ${showType(e.typerep)} not defined")], location=builtin)
     end;
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -216,7 +216,7 @@ top::Expr ::= e::Expr
   local localErrors::[Message] = e.errors;
   local fwrd::Expr =
     case e.typerep.defaultFunctionArrayLvalueConversion.strProd of
-      just(p) -> p(e, top.location)
+      just(p) -> p(decExpr(e, location=e.location), top.location)
     | nothing() -> errorExpr([err(e.location, s"str of ${showType(e.typerep)} not defined")], location=builtin)
     end;
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -299,14 +299,18 @@ top::Expr ::= e1::Expr e2::Expr
   top.pp = pp"${e1.pp} + ${e2.pp}";
   
   local localErrors::[Message] =
+    e1.errors ++ e2.errors ++
     checkStringHeaderDef("concat_string", top.location, top.env);
+  
+  e2.env = addEnv(e1.defs, e1.env);
+  
   local fwrd::Expr =
     directCallExpr(
       name("concat_string", location=builtin),
       consExpr(
-        strExpr(e1, location=builtin),
+        strExpr(decExpr(e1, location=builtin), location=builtin),
         consExpr(
-          strExpr(e2, location=builtin),
+          strExpr(decExpr(e2, location=builtin), location=builtin),
           nilExpr())),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -319,14 +323,18 @@ top::Expr ::= e1::Expr e2::Expr
   top.pp = pp"${e1.pp} - ${e2.pp}";
   
   local localErrors::[Message] =
+    e1.errors ++ e2.errors ++
     checkStringHeaderDef("remove_string", top.location, top.env);
+  
+  e2.env = addEnv(e1.defs, e1.env);
+  
   local fwrd::Expr =
     directCallExpr(
       name("remove_string", location=builtin),
       consExpr(
-        strExpr(e1, location=builtin),
+        strExpr(decExpr(e1, location=builtin), location=builtin),
         consExpr(
-          strExpr(e2, location=builtin),
+          strExpr(decExpr(e2, location=builtin), location=builtin),
           nilExpr())),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -339,15 +347,23 @@ top::Expr ::= e1::Expr e2::Expr
   top.pp = pp"${e1.pp} * ${e2.pp}";
   
   local localErrors::[Message] =
+    e1.errors ++ e2.errors ++
     checkStringHeaderDef("repeat_string", top.location, top.env) ++
     checkStringType(e1.typerep, "*", top.location) ++
     if e2.typerep.isIntegerType
     then []
     else [err(e2.location, s"string repeat must have integer type, but got ${showType(e2.typerep)}")];
+  
+  e2.env = addEnv(e1.defs, e1.env);
+  
   local fwrd::Expr =
     directCallExpr(
       name("repeat_string", location=builtin),
-      consExpr(e1, consExpr(e2, nilExpr())),
+      consExpr(
+        strExpr(decExpr(e1, location=builtin), location=builtin),
+        consExpr(
+          decExpr(e2, location=builtin),
+          nilExpr())),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
 }
@@ -359,14 +375,18 @@ top::Expr ::= e1::Expr e2::Expr
   top.pp = pp"${e1.pp} == ${e2.pp}";
   
   local localErrors::[Message] =
+    e1.errors ++ e2.errors ++
     checkStringHeaderDef("equals_string", top.location, top.env);
+  
+  e2.env = addEnv(e1.defs, e1.env);
+  
   local fwrd::Expr =
     directCallExpr(
       name("equals_string", location=builtin),
       consExpr(
-        strExpr(e1, location=builtin),
+        strExpr(decExpr(e1, location=builtin), location=builtin),
         consExpr(
-          strExpr(e2, location=builtin),
+          strExpr(decExpr(e2, location=builtin), location=builtin),
           nilExpr())),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -379,15 +399,23 @@ top::Expr ::= e1::Expr e2::Expr
   top.pp = pp"${e1.pp}[${e2.pp}]";
   
   local localErrors::[Message] =
+    e1.errors ++ e2.errors ++
     checkStringHeaderDef("subscript_string", top.location, top.env) ++
     checkStringType(e1.typerep, "[]", top.location) ++
     if e2.typerep.isIntegerType
     then []
     else [err(e2.location, s"string index must have integer type, but got ${showType(e2.typerep)}")];
+  
+  e2.env = addEnv(e1.defs, e1.env);
+  
   local fwrd::Expr =
     directCallExpr(
       name("subscript_string", location=builtin),
-      consExpr(e1, consExpr(e2, nilExpr())),
+      consExpr(
+        strExpr(decExpr(e1, location=builtin), location=builtin),
+        consExpr(
+          decExpr(e2, location=builtin),
+          nilExpr())),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
 }
@@ -420,7 +448,7 @@ top::Expr ::= lhs::Expr deref::Boolean rhs::Name
      else [err(rhs.location, s"string does not have member ${rhs.name}")]);
   local fwrd::Expr =
     ableC_Expr {
-      ((const struct _string_s)$Expr{lhs}).$Name{rhs}
+      ((const struct _string_s)$Expr{decExpr(lhs, location=builtin)}).$Name{rhs}
     };
   forwards to mkErrorCheck(localErrors, fwrd);
 }
@@ -431,6 +459,7 @@ top::Expr ::= e1::Expr a::Exprs
   propagate substituted;
   top.pp = pp"${e1.pp}.substring(${ppImplode(pp", ", a.pps)}";
   
+  a.env = addEnv(e1.defs, e1.env);
   a.expectedTypes = -- size_t
     [builtinType(nilQualifier(), unsignedType(longType())),
      builtinType(nilQualifier(), unsignedType(longType()))];
@@ -438,13 +467,14 @@ top::Expr ::= e1::Expr a::Exprs
   a.callExpr = top; -- Doesn't really matter, just needs location
   a.callVariadic = false;
   local localErrors::[Message] =
+    e1.errors ++ a.errors ++
     checkStringHeaderDef("substring", top.location, top.env) ++
     checkStringType(e1.typerep, "substring", top.location) ++
     a.argumentErrors;
   local fwrd::Expr =
     directCallExpr(
       name("substring", location=builtin),
-      consExpr(e1, a),
+      consExpr(decExpr(e1, location=builtin), a),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
 }
