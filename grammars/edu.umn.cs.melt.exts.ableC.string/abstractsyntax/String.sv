@@ -7,8 +7,42 @@ imports edu:umn:cs:melt:ableC:abstractsyntax:host;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
 imports edu:umn:cs:melt:ableC:abstractsyntax:env;
 imports edu:umn:cs:melt:ableC:abstractsyntax:substitution;
+imports edu:umn:cs:melt:ableC:abstractsyntax:builtins;
 imports edu:umn:cs:melt:ableC:abstractsyntax:overloadable as ovrld;
 --imports edu:umn:cs:melt:ableC:abstractsyntax:debug;
+
+aspect function getInitialEnvDefs
+[Def] ::=
+{
+  d <-
+    [valueDef(
+       "show",
+       builtinFunctionValueItem(
+         functionType(extType(nilQualifier(), stringType()), noProtoFunctionType(), nilQualifier()),
+         singleArgExtCallExpr(showExpr(_, location=_), _, _, location=_))),
+     valueDef(
+       "str",
+       builtinFunctionValueItem(
+         functionType(extType(nilQualifier(), stringType()), noProtoFunctionType(), nilQualifier()),
+         singleArgExtCallExpr(strExpr(_, location=_), _, _, location=_)))];
+}
+
+abstract production singleArgExtCallExpr
+top::Expr ::= handler::(Expr ::= Expr Location) f::Name a::Exprs
+{
+  propagate substituted;
+  top.pp = pp"${f.pp}(${ppImplode(pp", ", a.pps)})";
+  local localErrors::[Message] =
+    a.errors ++
+    if a.count != 1
+    then [err(top.location, s"${f.name} expected only 1 argument, got ${toString(a.count)}")]
+    else [];
+  local fwrd::Expr =
+    case a of
+    | consExpr(e, _) -> handler(decExpr(e, location=e.location), top.location)
+    end;
+  forwards to mkErrorCheck(localErrors, fwrd);
+}
 
 abstract production showExpr
 top::Expr ::= e::Expr

@@ -21,5 +21,7 @@ int main(int argc, char **argv) {
   a.length = 4; // Assign to string length
   a.text = "qwerty"; // Assign to strign text
 
+  str(1, 3.14); // Wrong number of arguments
+
   return 0;
 }

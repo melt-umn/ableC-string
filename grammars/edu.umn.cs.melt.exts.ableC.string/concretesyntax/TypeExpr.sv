@@ -1,11 +1,16 @@
 grammar edu:umn:cs:melt:exts:ableC:string:concretesyntax;
 
+imports edu:umn:cs:melt:ableC:concretesyntax;
+imports edu:umn:cs:melt:ableC:abstractsyntax:host;
+
+imports edu:umn:cs:melt:exts:ableC:string;
+
+marking terminal String_t 'string' lexer classes {Ctype, Cidentifier};
+
 aspect parser attribute context
   action {
     context = addIdentsToScope([name("string", location=builtin)], String_t, context);
   };
-
-marking terminal String_t 'string' lexer classes {Ctype, Cidentifier};
 
 concrete productions top::TypeSpecifier_c
 | 'string'
