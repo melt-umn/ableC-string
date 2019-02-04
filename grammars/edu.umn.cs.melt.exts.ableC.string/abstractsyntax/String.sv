@@ -85,10 +85,10 @@ top::Expr ::= e::Expr
   local localErrors::[Message] =
     checkStringHeaderDef("show_char_pointer", top.location, top.env);
   local fwrd::Expr =
-    directCallExpr(
-      name("show_char_pointer", location=builtin),
-      consExpr(e, nilExpr()),
-      location=builtin);
+    ableC_Expr {
+      // Cast in case argument is const char *
+      show_char_pointer((char *)$Expr{e})
+    };
   forwards to mkErrorCheck(localErrors, fwrd);
 }
 
@@ -274,10 +274,10 @@ top::Expr ::= e::Expr
   local localErrors::[Message] =
     checkStringHeaderDef("str_char_pointer", top.location, top.env);
   local fwrd::Expr =
-    directCallExpr(
-      name("str_char_pointer", location=builtin),
-      consExpr(e, nilExpr()),
-      location=builtin);
+    ableC_Expr {
+      // Cast in case argument is const char *
+      str_char_pointer((char *)$Expr{e})
+    };
   forwards to mkErrorCheck(localErrors, fwrd);
 }
 
