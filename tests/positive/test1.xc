@@ -88,30 +88,30 @@ int main(int argc, char **argv) {
   if (m != "\"\\\"abcd\\\\n\\\\n\\\\\\\\\\\"\"")
     return 14;
 
-  int x = 12;
-  int *y = &x;
-  int *z = (int *)0x42;
+  int nx = 12;
+  int *ny = &nx;
+  int *nz = (int *)0x42;
   
-  string n = show(y);
+  string n = show(ny);
   printf("n: %s\n", n.text);
   if (n != "&12")
     return 15;
   
-  string o = str(y);
+  string o = str(ny);
   printf("o: %s\n", o.text);
-  string p = show(&y);
+  string p = show(&ny);
   printf("p: %s\n", p.text);
   if (p != "&&12")
     return 16;
   
-  string q = str(&y);
+  string q = str(&ny);
   printf("q: %s\n", q.text);
-  string r = show(z);
+  string r = show(nz);
   printf("r: %s\n", r.text);
   if (r != "<signed int *  at 0x42>")
     return 17;
   
-  string s = str(z);
+  string s = str(nz);
   printf("s: %s\n", s.text);
 
   string t = str(A);
@@ -134,6 +134,13 @@ int main(int argc, char **argv) {
   printf("w: %s\n", w.text);
   if (w != "&C")
     return 21;
+
+  const char *strconst = "foobar";
+  string x = str(strconst);
+  printf("x: %s\n", x.text);
+  if (x != "foobar")
+    return 22;
+  
 
   return 0;
 }
