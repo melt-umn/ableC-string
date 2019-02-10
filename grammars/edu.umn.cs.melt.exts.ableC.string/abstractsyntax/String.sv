@@ -290,8 +290,11 @@ top::Expr ::= e::Expr
   decl.returnType = nothing();
   decl.isTopLevel = false;
   
+  local headerCheck::[Message] = checkStringHeaderDef("concat_string", top.location, top.env);
   local localErrors::[Message] =
-    case e.typerep, structLookup of
+    if !null(headerCheck)
+    then headerCheck
+    else case e.typerep, structLookup of
     | errorType(), _ -> []
     | extType(_, refIdExtType(structSEU(), "<anon>", _)), _ ->
       [err(top.location, s"Can't show anonymous struct")]
@@ -406,7 +409,10 @@ top::StructDeclarator ::= name::Name  ty::TypeModifierExpr  attrs::Attributes
   top.showTransforms =
     [ableC_Expr {
        $stringLiteralExpr{"." ++ name.name ++ " = "} +
-         $Expr{showExpr(ableC_Expr { s.$Name{name} }, location=name.location)}
+         $Expr{
+           showExpr(
+             parenExpr(ableC_Expr { s.$Name{name} }, location=name.location),
+             location=name.location)}
      }];
 }
 aspect production structBitfield
@@ -417,7 +423,10 @@ top::StructDeclarator ::= name::MaybeName  ty::TypeModifierExpr  e::Expr  attrs:
     | justName(n) ->
      [ableC_Expr {
          $stringLiteralExpr{"." ++ n.name ++ " = "} +
-           $Expr{showExpr(ableC_Expr { s.$Name{n} }, location=n.location)}
+           $Expr{
+             showExpr(
+               parenExpr(ableC_Expr { s.$Name{n} }, location=n.location),
+               location=n.location)}
        }]
     | nothingName() -> []
     end;
