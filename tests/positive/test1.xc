@@ -7,6 +7,20 @@ enum foo {
   A, B, C
 };
 
+struct bar {
+  enum foo w;
+  char *x;
+  union {
+    int y;
+    float z;
+  };
+};
+
+struct baz {
+  struct bar h;
+  struct baz *t;
+};
+
 int main(int argc, char **argv) {
   string a = str("abc");
   printf("a: %s\n", a.text);
@@ -140,7 +154,13 @@ int main(int argc, char **argv) {
   printf("x: %s\n", x.text);
   if (x != "foobar")
     return 22;
-  
 
+  struct baz b1 = {{A, "hello", {.y = 42}}, NULL};
+  struct baz b2 = {{B, "world", {.z = 3.14f}}, &b1};
+  string y = show(b2);
+  printf("y: %s\n", y.text);
+  if (y != "{.h = {.w = B, .x = \"world\", {.y = 1078523331, .z = 3.14}}, .t = &{.h = {.w = A, .x = \"hello\", {.y = 42, .z = 5.88545e-44}}, .t = <struct baz *  at 0x0>}}")
+    return 23;
+  
   return 0;
 }

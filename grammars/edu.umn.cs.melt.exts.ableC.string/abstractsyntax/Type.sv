@@ -176,6 +176,12 @@ top::ExtType ::=
   top.strProd = just(strString(_, location=_));
 }
 
+aspect production refIdExtType
+top::ExtType ::= kwd::StructOrEnumOrUnion  n::String  refId::String
+{
+  top.showProd = just(showStructUnion(_, location=_));
+}
+
 aspect production enumExtType
 top::ExtType ::= ref::Decorated EnumDecl
 {

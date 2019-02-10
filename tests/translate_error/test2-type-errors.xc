@@ -5,11 +5,15 @@
 
 typedef struct {int a;} t;
 
+struct foo {
+  t *a;
+};
+
 int main(int argc, char **argv) {
   string a = str((t){4}); // str of a type without str defined
 
   t foo = {3};
-  string b = show(&foo); // str of a type without str defined
+  string b = show((struct foo){&foo}); // show of a type without show defined
   string c = 4 * "q";
 
   b.substring("a");
