@@ -208,7 +208,7 @@ top::BuiltinType ::= sub::IntegerType
     | _ ->
       \ e::Expr ->
         directCallExpr(
-          name("str_int", location=builtin),
+          name("show_int", location=builtin),
           consExpr(e, nilExpr()),
           location=builtin)
     end;
