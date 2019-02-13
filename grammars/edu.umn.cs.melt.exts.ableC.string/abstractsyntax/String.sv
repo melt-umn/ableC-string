@@ -50,29 +50,9 @@ top::Expr ::= e::Expr
   propagate substituted;
   top.pp = pp"show(${e.pp})";
   
-  local localErrors::[Message] = e.errors;
-  local fwrd::Expr =
-    case e.typerep.defaultFunctionArrayLvalueConversion.showProd of
-      just(p) -> p(decExpr(e, location=e.location), top.location)
-    | nothing() -> errorExpr([err(e.location, s"show of ${showType(e.typerep)} not defined")], location=builtin)
-    end;
-  forwards to mkErrorCheck(localErrors, fwrd);
-}
-
-abstract production showString
-top::Expr ::= e::Expr
-{
-  propagate substituted;
-  top.pp = pp"show(${e.pp})";
-  
-  local localErrors::[Message] =
-    checkStringType(e.typerep, "show", top.location) ++
-    checkStringHeaderDef("show_string", top.location, top.env);
-  local fwrd::Expr =
-    directCallExpr(
-      name("show_string", location=builtin),
-      consExpr(e, nilExpr()),
-      location=builtin);
+  local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
+  local localErrors::[Message] = e.errors ++ type.showErrors(e.location, e.env);
+  local fwrd::Expr = type.showProd(decExpr(e, location=builtin));
   forwards to mkErrorCheck(localErrors, fwrd);
 }
 
@@ -82,90 +62,14 @@ top::Expr ::= e::Expr
   propagate substituted;
   top.pp = pp"show(${e.pp})";
   
-  local localErrors::[Message] =
-    checkStringHeaderDef("show_char_pointer", top.location, top.env);
-  local fwrd::Expr =
+  forwards to
     ableC_Expr {
       // Cast in case argument is const char *
       show_char_pointer((char *)$Expr{e})
     };
-  forwards to mkErrorCheck(localErrors, fwrd);
-}
-
-abstract production showChar
-top::Expr ::= e::Expr
-{
-  propagate substituted;
-  top.pp = pp"show(${e.pp})";
-  
-  local localErrors::[Message] =
-    checkStringHeaderDef("show_char", top.location, top.env);
-  local fwrd::Expr =
-    directCallExpr(
-      name("show_char", location=builtin),
-      consExpr(e, nilExpr()),
-      location=builtin);
-  forwards to mkErrorCheck(localErrors, fwrd);
-}
-
-abstract production showInt
-top::Expr ::= e::Expr
-{
-  propagate substituted;
-  top.pp = pp"show(${e.pp})";
-  
-  local localErrors::[Message] =
-    checkStringHeaderDef("show_int", top.location, top.env);
-  local fwrd::Expr =
-    directCallExpr(
-      name("show_int", location=builtin),
-      consExpr(e, nilExpr()),
-      location=builtin);
-  forwards to mkErrorCheck(localErrors, fwrd);
-}
-
-abstract production showFloat
-top::Expr ::= e::Expr
-{
-  propagate substituted;
-  top.pp = pp"show(${e.pp})";
-  
-  local localErrors::[Message] =
-    checkStringHeaderDef("show_float", top.location, top.env);
-  local fwrd::Expr =
-    directCallExpr(
-      name("show_float", location=builtin),
-      consExpr(e, nilExpr()),
-      location=builtin);
-  forwards to mkErrorCheck(localErrors, fwrd);
 }
 
 synthesized attribute showTransform::Expr;
-
-abstract production showEnum
-top::Expr ::= e::Expr
-{
-  propagate substituted;
-  top.pp = pp"show(${e.pp})";
-  
-  local decl::Decorated EnumDecl =
-    case e.typerep of
-    | extType(_, enumExtType(decl)) -> decl
-    end;
-  
-  local localErrors::[Message] =
-    checkStringHeaderDef("str_char_pointer", top.location, top.env) ++
-    case e.typerep of
-    | extType(_, enumExtType(_)) -> []
-    | _ -> [err(e.location, s"Expected an enum type (got ${showType(e.typerep)})")]
-    end;
-  local fwrd::Expr =
-    ableC_Expr {
-      ({$directTypeExpr{e.typerep} _enum_val = $Expr{e};
-        $Expr{decl.showTransform};})
-    };
-  forwards to mkErrorCheck(localErrors, fwrd);
-}
 
 attribute showTransform occurs on EnumDecl, EnumItemList;
 
@@ -194,7 +98,7 @@ top::EnumItemList ::=
       "<" +
       ($stringLiteralExpr{showType(top.containingEnum)} +
        (" " +
-        ($Expr{strExpr(ableC_Expr {(unsigned)_enum_val}, location=builtin)} +
+        (show_int((unsigned)_enum_val) +
          ">")))
     };
 }
@@ -210,19 +114,7 @@ top::Expr ::= e::Expr
     | pointerType(_, t) -> t
     | _ -> errorType()
     end;
-  local localErrors::[Message] =
-    e.errors ++
-    -- TODO: Hack for computing sub-type show errors
-    decorate
-      showExpr(
-        dereferenceExpr(decExpr(e, location=builtin), location=e.location),
-        location=top.location)
-    with {
-      env = top.env;
-      returnType = top.returnType;
-    }.errors ++
-    checkStringHeaderDef("_handle_segv", top.location, top.env);
-  local fwrd::Expr =
+  forwards to
     ableC_Expr {
       ({$directTypeExpr{e.typerep} _ptr = $Expr{e};
         $directTypeExpr{subType.withoutTypeQualifiers} _ptr_val;
@@ -249,91 +141,48 @@ top::Expr ::= e::Expr
             sprintf(_text, "<%s at 0x%lx>", _baseTypeName, (unsigned long)_ptr);
             ($directTypeExpr{extType(nilQualifier(), stringType())}){strlen(_text), _text};});})
     };
-  forwards to mkErrorCheck(localErrors, fwrd);
 }
 
-abstract production showStructUnion
+abstract production showStruct
 top::Expr ::= e::Expr
 {
   propagate substituted;
   top.pp = pp"show(${e.pp})";
   
-  local structLookup::[RefIdItem] =
-    case e.typerep.maybeRefId of
-    | just(rid) -> lookupRefId(rid, top.env)
-    | nothing() -> []
+  local decl::Decorated StructDecl =
+    case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
+    | structRefIdItem(decl) :: _ -> decl
     end;
   
-  local items::Decorated StructItemList =
-    case structLookup of
-    | structRefIdItem(structDecl(_, _, items)) :: _ -> items
-    | unionRefIdItem(unionDecl(_, _, items)) :: _ -> items
-    end;
-  
-  local showTransform::Expr =
-    case structLookup of
-    | structRefIdItem(d) :: _ -> d.showTransform
-    | unionRefIdItem(d) :: _ -> d.showTransform
-    end;
-  local showFnName::String = s"_show_${e.typerep.mangledName}";
-  local showFnDecls::Decls =
-    ableC_Decls {
-      $BaseTypeExpr{stringTypeExpr(nilQualifier(), builtin)} $name{showFnName}(
-          $directTypeExpr{e.typerep});
-      $BaseTypeExpr{stringTypeExpr(nilQualifier(), builtin)} $name{showFnName}(
-          $directTypeExpr{e.typerep} s) {
-        return $Expr{showTransform};
-      }
-    };
-  local decl::Decl = showDecl(showFnName, showFnDecls);
-  decl.env = globalEnv(top.env);
-  decl.returnType = nothing();
-  decl.isTopLevel = false;
-  
-  local headerCheck::[Message] = checkStringHeaderDef("concat_string", top.location, top.env);
-  local localErrors::[Message] =
-    if !null(headerCheck)
-    then headerCheck
-    else case e.typerep, structLookup of
-    | errorType(), _ -> []
-    | extType(_, refIdExtType(structSEU(), "<anon>", _)), _ ->
-      [err(top.location, s"Can't show anonymous struct")]
-    | extType(_, refIdExtType(unionSEU(), "<anon>", _)), _ ->
-      [err(top.location, s"Can't show anonymous union")]
-    | extType(_, refIdExtType(structSEU(), id, _)), [] ->
-      [err(top.location, s"struct ${id} does not have a definition.")]
-    | extType(_, refIdExtType(unionSEU(), id, _)), [] ->
-      [err(top.location, s"union ${id} does not have a definition.")]
-    | extType(_, refIdExtType(structSEU(), id, _)), _ ->
-      if !null(decl.errors)
-      then [nested(e.location, s"In showing struct ${id}", decl.errors)]
-      else []
-    | extType(_, refIdExtType(unionSEU(), id, _)), _ ->
-      if !null(decl.errors)
-      then [nested(e.location, s"In showing union ${id}", decl.errors)]
-      else []
-    | _, _ -> [err(e.location, s"Expected a struct/union type (got ${showType(e.typerep)})")]
-    end;
-  
-  local fwrd::Expr =
+  forwards to
     injectGlobalDeclsExpr(
-      foldDecl([decDecl(decl)]),
-      ableC_Expr { $name{showFnName}($Expr{e}) },
+      foldDecl([maybeValueDecl(decl.showFnName, decls(decl.showFnDecls))]),
+      ableC_Expr { $name{decl.showFnName}($Expr{e}) },
       location=builtin);
-  forwards to mkErrorCheck(localErrors, fwrd);
 }
 
-abstract production showDecl
-top::Decl ::= showFnName::String showFnDecls::Decls
+abstract production showUnion
+top::Expr ::= e::Expr
 {
   propagate substituted;
-  top.pp = pp"showDecl {${nestlines(2, terminate(line(), showFnDecls.pps))}}";
+  top.pp = pp"show(${e.pp})";
+  
+  local decl::Decorated UnionDecl =
+    case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
+    | unionRefIdItem(decl) :: _ -> decl
+    end;
+  
   forwards to
-    if !null(lookupValue(showFnName, top.env))
-    then decls(nilDecl())
-    else decls(showFnDecls);
+    injectGlobalDeclsExpr(
+      foldDecl([maybeValueDecl(decl.showFnName, decls(decl.showFnDecls))]),
+      ableC_Expr { $name{decl.showFnName}($Expr{e}) },
+      location=builtin);
 }
 
+synthesized attribute showDeclErrors::([Message] ::= Location Decorated Env) occurs on StructDecl, UnionDecl;
+synthesized attribute showFnName::String occurs on StructDecl, UnionDecl;
+synthesized attribute showFnDecls::Decls occurs on StructDecl, UnionDecl;
+attribute showErrors occurs on StructDecl, UnionDecl, StructItemList, StructItem, StructDeclarators, StructDeclarator;
 attribute showTransform occurs on StructDecl, UnionDecl;
 synthesized attribute showTransforms::[Expr] occurs on StructItemList, StructItem, StructDeclarators, StructDeclarator;
 
@@ -346,66 +195,121 @@ global foldShowTransform::(Expr ::= [Expr]) =
 aspect production structDecl
 top::StructDecl ::= attrs::Attributes  name::MaybeName  dcls::StructItemList
 {
+  local n::String = name.maybename.fromJust.name;
+  top.showDeclErrors =
+    \ l::Location env::Decorated Env ->
+      if !name.maybename.isJust
+      then [err(l, "Cannot show anonymous struct")]
+      else if null(lookupValue(top.showFnName, env))
+      then
+        case top.showErrors(top.location, addEnv([valueDef(top.showFnName, errorValueItem())], env)) of
+        | [] -> []
+        | m -> [nested(l, s"In showing struct ${n}", m)]
+        end
+      else [];
+  top.showFnName = s"_show_${n}";
+  top.showFnDecls =
+    ableC_Decls {
+      static $BaseTypeExpr{stringTypeExpr(nilQualifier(), builtin)} $name{top.showFnName}(struct $name{n});
+      static $BaseTypeExpr{stringTypeExpr(nilQualifier(), builtin)} $name{top.showFnName}(struct $name{n} s) {
+        return $Expr{top.showTransform};
+      }
+    };
+  top.showErrors = dcls.showErrors;
   top.showTransform = ableC_Expr { "{" + $Expr{foldShowTransform(dcls.showTransforms)} + "}" };
 }
 
 aspect production unionDecl
 top::UnionDecl ::= attrs::Attributes  name::MaybeName  dcls::StructItemList
 {
+  local n::String = name.maybename.fromJust.name;
+  top.showDeclErrors =
+    \ l::Location env::Decorated Env ->
+      if !name.maybename.isJust
+      then [err(l, "Cannot show anonymous union")]
+      else if null(lookupValue(top.showFnName, env))
+      then
+        case top.showErrors(top.location, addEnv([valueDef(top.showFnName, errorValueItem())], env)) of
+        | [] -> []
+        | m -> [nested(l, s"In showing union ${n}", m)]
+        end
+      else [];
+  top.showFnName = s"_show_${n}";
+  top.showFnDecls =
+    ableC_Decls {
+      static $BaseTypeExpr{stringTypeExpr(nilQualifier(), builtin)} $name{top.showFnName}(union $name{n});
+      static $BaseTypeExpr{stringTypeExpr(nilQualifier(), builtin)} $name{top.showFnName}(union $name{n} s) {
+        return $Expr{top.showTransform};
+      }
+    };
+  top.showErrors = dcls.showErrors;
   top.showTransform = ableC_Expr { "{" + $Expr{foldShowTransform(dcls.showTransforms)} + "}" };
 }
 
 aspect production consStructItem
 top::StructItemList ::= h::StructItem  t::StructItemList
 {
+  top.showErrors =
+    \ l::Location env::Decorated Env -> h.showErrors(l, env) ++ t.showErrors(l, env);
   top.showTransforms = h.showTransforms ++ t.showTransforms;
 }
 aspect production nilStructItem
 top::StructItemList ::=
 {
+  top.showErrors = \ l::Location env::Decorated Env -> [];
   top.showTransforms = [];
 }
 
 aspect production structItem
 top::StructItem ::= attrs::Attributes  ty::BaseTypeExpr  dcls::StructDeclarators
 {
+  top.showErrors = dcls.showErrors;
   top.showTransforms = dcls.showTransforms;
 }
 aspect production structItems
 top::StructItem ::= dcls::StructItemList
 {
+  top.showErrors = dcls.showErrors;
   top.showTransforms = dcls.showTransforms;
 }
 aspect production anonStructStructItem
 top::StructItem ::= d::StructDecl
 {
+  top.showErrors = d.showErrors;
   top.showTransforms = [d.showTransform];
 }
 aspect production anonUnionStructItem
 top::StructItem ::= d::UnionDecl
 {
+  top.showErrors = d.showErrors;
   top.showTransforms = [d.showTransform];
 }
 aspect production warnStructItem
 top::StructItem ::= msg::[Message]
 {
+  top.showErrors = \ l::Location env::Decorated Env -> [];
   top.showTransforms = [];
 }
 
 aspect production consStructDeclarator
 top::StructDeclarators ::= h::StructDeclarator  t::StructDeclarators
 {
+  top.showErrors =
+    \ l::Location env::Decorated Env -> h.showErrors(l, env) ++ t.showErrors(l, env);
   top.showTransforms = h.showTransforms ++ t.showTransforms;
 }
 aspect production nilStructDeclarator
 top::StructDeclarators ::=
 {
+  top.showErrors = \ l::Location env::Decorated Env -> [];
   top.showTransforms = [];
 }
 
 aspect production structField
 top::StructDeclarator ::= name::Name  ty::TypeModifierExpr  attrs::Attributes
 {
+  top.showErrors =
+    \ Location env::Decorated Env -> top.typerep.showErrors(top.sourceLocation, env);
   top.showTransforms =
     [ableC_Expr {
        $stringLiteralExpr{"." ++ name.name ++ " = "} +
@@ -418,6 +322,8 @@ top::StructDeclarator ::= name::Name  ty::TypeModifierExpr  attrs::Attributes
 aspect production structBitfield
 top::StructDeclarator ::= name::MaybeName  ty::TypeModifierExpr  e::Expr  attrs::Attributes
 {
+  top.showErrors =
+    \ Location env::Decorated Env -> top.typerep.showErrors(top.sourceLocation, env);
   top.showTransforms =
     case name of
     | justName(n) ->
@@ -434,6 +340,7 @@ top::StructDeclarator ::= name::MaybeName  ty::TypeModifierExpr  e::Expr  attrs:
 aspect production warnStructField
 top::StructDeclarator ::= msg::[Message]
 {
+  top.showErrors = \ l::Location env::Decorated Env -> [];
   top.showTransforms = [];
 }
 
@@ -443,22 +350,10 @@ top::Expr ::= e::Expr
   propagate substituted;
   top.pp = pp"str(${e.pp})";
   
-  local localErrors::[Message] = e.errors;
-  local fwrd::Expr =
-    case e.typerep.defaultFunctionArrayLvalueConversion.strProd of
-      just(p) -> p(decExpr(e, location=e.location), top.location)
-    | nothing() -> errorExpr([err(e.location, s"str of ${showType(e.typerep)} not defined")], location=builtin)
-    end;
+  local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
+  local localErrors::[Message] = e.errors ++ type.strErrors(e.location, e.env);
+  local fwrd::Expr = type.strProd(decExpr(e, location=builtin));
   forwards to mkErrorCheck(localErrors, fwrd);
-}
-
-abstract production strString
-top::Expr ::= e::Expr
-{
-  propagate substituted;
-  top.pp = pp"str(${e.pp})";
-  
-  forwards to e;
 }
 
 abstract production strCharPointer
@@ -467,46 +362,11 @@ top::Expr ::= e::Expr
   propagate substituted;
   top.pp = pp"str(${e.pp})";
   
-  local localErrors::[Message] =
-    checkStringHeaderDef("str_char_pointer", top.location, top.env);
-  local fwrd::Expr =
+  forwards to
     ableC_Expr {
       // Cast in case argument is const char *
       str_char_pointer((char *)$Expr{e})
     };
-  forwards to mkErrorCheck(localErrors, fwrd);
-}
-
-abstract production strChar
-top::Expr ::= e::Expr
-{
-  propagate substituted;
-  top.pp = pp"str(${e.pp})";
-  
-  local localErrors::[Message] =
-    checkStringHeaderDef("str_char", top.location, top.env);
-  local fwrd::Expr =
-    directCallExpr(
-      name("str_char", location=builtin),
-      consExpr(e, nilExpr()),
-      location=builtin);
-  forwards to mkErrorCheck(localErrors, fwrd);
-}
-
-abstract production strPointer
-top::Expr ::= e::Expr
-{
-  propagate substituted;
-  top.pp = pp"str(${e.pp})";
-  
-  local localErrors::[Message] =
-    checkStringHeaderDef("str_pointer", top.location, top.env);
-  local fwrd::Expr =
-    directCallExpr(
-      name("str_pointer", location=builtin),
-      consExpr(e, nilExpr()),
-      location=builtin);
-  forwards to mkErrorCheck(localErrors, fwrd);
 }
 
 abstract production assignString

@@ -44,147 +44,248 @@ top::ExtType ::=
   top.memberProd = just(memberString(_, _, _, location=_));
 }
 
-synthesized attribute showProd::Maybe<(Expr ::= Expr Location)> occurs on Type, BuiltinType, ExtType;
-synthesized attribute pointerShowProd::Maybe<(Expr ::= Expr Location)> occurs on Type, BuiltinType;
-synthesized attribute strProd::Maybe<(Expr ::= Expr Location)> occurs on Type, BuiltinType, ExtType;
-synthesized attribute pointerStrProd::Maybe<(Expr ::= Expr Location)> occurs on Type, BuiltinType;
+synthesized attribute showErrors::([Message] ::= Location Decorated Env) occurs on Type, BuiltinType, ExtType;
+synthesized attribute strErrors::([Message] ::= Location Decorated Env) occurs on Type, BuiltinType, ExtType;
+synthesized attribute showProd::(Expr ::= Expr) occurs on Type, BuiltinType, ExtType;
+synthesized attribute strProd::(Expr ::= Expr) occurs on Type, BuiltinType, ExtType;
 
 aspect default production
 top::Type ::=
 {
-  top.showProd = nothing();
-  top.pointerShowProd = nothing();
-  top.strProd = nothing();
-  top.pointerStrProd = nothing();
+  top.showErrors =
+    \ l::Location Decorated Env ->
+      [err(l, s"show is not defined for type ${showType(top)}")];
+  top.strErrors =
+    \ l::Location Decorated Env ->
+      [err(l, s"show is not defined for type ${showType(top)}")];
+  top.showProd = error("Undefined");
+  top.strProd = error("Undefined");
 }
 
 aspect production errorType
 top::Type ::= 
 {
-  top.showProd = just(\ e::Expr l::Location -> errorExpr([], location=l));
-  top.strProd = just(\ e::Expr l::Location -> errorExpr([], location=l));
+  top.showErrors = \ l::Location Decorated Env -> [];
+  top.strErrors = \ l::Location Decorated Env -> [];
+  top.showProd = \ e::Expr -> errorExpr([], location=builtin);
+  top.strProd = \ e::Expr -> errorExpr([], location=builtin);
 }
 
 aspect production pointerType
 top::Type ::= quals::Qualifiers sub::Type
 {
+  top.showErrors =
+    \ l::Location env::Decorated Env ->
+      checkStringHeaderDef("show_char_pointer", l, env) ++ sub.showErrors(l, env);
+  top.strErrors =
+    \ l::Location env::Decorated Env ->
+      checkStringHeaderDef("str_char_pointer", l, env) ++ sub.strErrors(l, env);
   top.showProd =
-    case sub.pointerShowProd of
-      just(prod) -> just(prod)
-    | nothing() -> just(showPointer(_, location=_))
+    case sub of
+    | builtinType(_, signedType(charType())) -> showCharPointer(_, location=builtin)
+    | builtinType(_, unsignedType(charType())) -> showCharPointer(_, location=builtin)
+    | _ -> showPointer(_, location=builtin)
     end;
   top.strProd =
-    case sub.pointerStrProd of
-      just(prod) -> just(prod)
-    | nothing() -> just(strPointer(_, location=_))
+    case sub of
+    | builtinType(_, signedType(charType())) -> strCharPointer(_, location=builtin)
+    | builtinType(_, unsignedType(charType())) -> strCharPointer(_, location=builtin)
+    | _ ->
+      \ e::Expr ->
+        directCallExpr(
+          name("str_pointer", location=builtin),
+          consExpr(e, nilExpr()),
+          location=builtin)
     end;
-}
-
-aspect default production
-top::BuiltinType ::=
-{
-  top.showProd = nothing();
-  top.pointerShowProd = nothing();
-  top.strProd = nothing();
-  top.pointerStrProd = nothing();
 }
 
 aspect production builtinType
 top::Type ::= quals::Qualifiers sub::BuiltinType
 {
+  top.showErrors = sub.showErrors;
+  top.strErrors = sub.strErrors;
   top.showProd = sub.showProd;
-  top.pointerShowProd = sub.pointerShowProd;
   top.strProd = sub.strProd;
-  top.pointerStrProd = sub.pointerStrProd;
+}
+
+aspect default production
+top::BuiltinType ::=
+{
+  top.showErrors =
+    \ l::Location Decorated Env ->
+      [err(l, s"show is not defined for type ${showType(builtinType(nilQualifier(), top))}")];
+  top.strErrors =
+    \ l::Location Decorated Env ->
+      [err(l, s"show is not defined for type ${showType(builtinType(nilQualifier(), top))}")];
+  top.showProd = error("Undefined");
+  top.strProd = error("Undefined");
 }
 
 aspect production realType
 top::BuiltinType ::= sub::RealType
 {
-  top.showProd = just(showFloat(_, location=_));
-  top.strProd = just(showFloat(_, location=_));
+  top.showErrors = checkStringHeaderDef("show_float", _, _);
+  top.strErrors = checkStringHeaderDef("str_float", _, _);
+  top.showProd =
+    \ e::Expr ->
+      directCallExpr(
+        name("show_float", location=builtin),
+        consExpr(e, nilExpr()),
+        location=builtin);
+  top.strProd =
+    \ e::Expr ->
+      directCallExpr(
+        name("str_float", location=builtin),
+        consExpr(e, nilExpr()),
+        location=builtin);
 }
 
 aspect production signedType
 top::BuiltinType ::= sub::IntegerType
 {
+  top.showErrors = checkStringHeaderDef("show_int", _, _);
+  top.strErrors = checkStringHeaderDef("show_int", _, _);
   top.showProd =
     case sub of
-      charType() -> just(showChar(_, location=_))
-    | _ -> just(showInt(_, location=_))
-    end;
-  top.pointerShowProd =
-    case sub of
-      charType() -> just(showCharPointer(_, location=_))
-    | _ -> nothing()
+    | charType() ->
+      \ e::Expr ->
+        directCallExpr(
+          name("show_char", location=builtin),
+          consExpr(e, nilExpr()),
+          location=builtin)
+    | _ ->
+      \ e::Expr ->
+        directCallExpr(
+          name("show_int", location=builtin),
+          consExpr(e, nilExpr()),
+          location=builtin)
     end;
   top.strProd =
     case sub of
-      charType() -> just(strChar(_, location=_))
-    | _ -> just(showInt(_, location=_))
-    end;
-  top.pointerStrProd =
-    case sub of
-      charType() -> just(strCharPointer(_, location=_))
-    | _ -> nothing()
+    | charType() ->
+      \ e::Expr ->
+        directCallExpr(
+          name("str_char", location=builtin),
+          consExpr(e, nilExpr()),
+          location=builtin)
+    | _ ->
+      \ e::Expr ->
+        directCallExpr(
+          name("show_int", location=builtin),
+          consExpr(e, nilExpr()),
+          location=builtin)
     end;
 }
 
 aspect production unsignedType
 top::BuiltinType ::= sub::IntegerType
 {
+  top.showErrors = checkStringHeaderDef("show_int", _, _);
+  top.strErrors = checkStringHeaderDef("show_int", _, _);
   top.showProd =
     case sub of
-      charType() -> just(showChar(_, location=_))
-    | _ -> just(showInt(_, location=_))
-    end;
-  top.pointerShowProd =
-    case sub of
-      charType() -> just(showCharPointer(_, location=_))
-    | _ -> nothing()
+    | charType() ->
+      \ e::Expr ->
+        directCallExpr(
+          name("show_char", location=builtin),
+          consExpr(e, nilExpr()),
+          location=builtin)
+    | _ ->
+      \ e::Expr ->
+        directCallExpr(
+          name("show_int", location=builtin),
+          consExpr(e, nilExpr()),
+          location=builtin)
     end;
   top.strProd =
     case sub of
-      charType() -> just(strChar(_, location=_))
-    | _ -> just(showInt(_, location=_))
+    | charType() ->
+      \ e::Expr ->
+        directCallExpr(
+          name("str_char", location=builtin),
+          consExpr(e, nilExpr()),
+          location=builtin)
+    | _ ->
+      \ e::Expr ->
+        directCallExpr(
+          name("str_int", location=builtin),
+          consExpr(e, nilExpr()),
+          location=builtin)
     end;
-  top.pointerStrProd =
-    case sub of
-      charType() -> just(strCharPointer(_, location=_))
-    | _ -> nothing()
-    end;
-}
-
-aspect default production
-top::ExtType ::=
-{
-  top.showProd = nothing();
-  top.strProd = nothing();
 }
 
 aspect production extType
 top::Type ::= quals::Qualifiers sub::ExtType
 {
+  top.showErrors = sub.showErrors;
+  top.strErrors = sub.strErrors;
   top.showProd = sub.showProd;
   top.strProd = sub.strProd;
+}
+
+aspect default production
+top::ExtType ::=
+{
+  top.showErrors =
+    \ l::Location Decorated Env ->
+      [err(l, s"show is not defined for type ${showType(extType(nilQualifier(), top))}")];
+  top.strErrors =
+    \ l::Location Decorated Env ->
+      [err(l, s"show is not defined for type ${showType(extType(nilQualifier(), top))}")];
+  top.showProd = error("Undefined");
+  top.strProd = error("Undefined");
 }
 
 aspect production stringType
 top::ExtType ::=
 {
-  top.showProd = just(showString(_, location=_));
-  top.strProd = just(strString(_, location=_));
+  top.showErrors = checkStringHeaderDef("show_string", _, _);
+  top.strErrors = \ Location Decorated Env -> [];
+  top.showProd =
+    \ e::Expr ->
+      directCallExpr(
+        name("show_string", location=builtin),
+        consExpr(e, nilExpr()),
+        location=builtin);
+  top.strProd = \ e::Expr -> e;
 }
 
 aspect production refIdExtType
 top::ExtType ::= kwd::StructOrEnumOrUnion  n::String  refId::String
 {
-  top.showProd = just(showStructUnion(_, location=_));
+  local topType::Type = extType(top.givenQualifiers, top);
+  top.showErrors =
+    \ l::Location env::Decorated Env ->
+      checkStringHeaderDef("concat_string", l, env) ++
+      case kwd, lookupRefId(refId, globalEnv(env)) of
+      | structSEU(), structRefIdItem(decl) :: _ -> decl.showDeclErrors(l, env)
+      | unionSEU(), unionRefIdItem(decl) :: _ -> decl.showDeclErrors(l, env)
+      | structSEU(), _ -> [err(l, s"struct ${n} does not have a (global) definition.")]
+      | unionSEU(), _ -> [err(l, s"union ${n} does not have a (global) definition.")]
+      | _, _ -> error("Unexpected refIdExtType")
+      end;
+  top.showProd =
+    case kwd of
+    | structSEU() -> showStruct(_, location=builtin)
+    | unionSEU() -> showUnion(_, location=builtin)
+    end;
 }
 
 aspect production enumExtType
 top::ExtType ::= ref::Decorated EnumDecl
 {
-  top.showProd = just(showEnum(_, location=_));
-  top.strProd = just(showInt(_, location=_));
+  top.showErrors = checkStringHeaderDef("show_char_pointer", _, _);
+  top.strErrors = checkStringHeaderDef("show_int", _, _);
+  top.showProd =
+    \ e::Expr ->
+      ableC_Expr {
+        ({$directTypeExpr{extType(nilQualifier(), top)} _enum_val = $Expr{e};
+          $Expr{ref.showTransform};})
+      };
+  top.strProd =
+    \ e::Expr ->
+      directCallExpr(
+        name("show_int", location=builtin),
+        consExpr(e, nilExpr()),
+        location=builtin);
 }
