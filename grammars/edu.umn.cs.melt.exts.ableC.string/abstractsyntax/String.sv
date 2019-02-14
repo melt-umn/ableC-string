@@ -390,6 +390,8 @@ top::Expr ::= e1::Expr e2::Expr
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
+    e1.typerep.strErrors(e1.location, e1.env) ++
+    e2.typerep.strErrors(e2.location, e2.env) ++
     checkStringHeaderDef("concat_string", top.location, top.env);
   
   e2.env = addEnv(e1.defs, e1.env);
@@ -414,6 +416,8 @@ top::Expr ::= e1::Expr e2::Expr
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
+    e1.typerep.strErrors(e1.location, e1.env) ++
+    e2.typerep.strErrors(e2.location, e2.env) ++
     checkStringHeaderDef("remove_string", top.location, top.env);
   
   e2.env = addEnv(e1.defs, e1.env);
@@ -450,7 +454,7 @@ top::Expr ::= e1::Expr e2::Expr
     directCallExpr(
       name("repeat_string", location=builtin),
       consExpr(
-        strExpr(decExpr(e1, location=builtin), location=builtin),
+        decExpr(e1, location=builtin),
         consExpr(
           decExpr(e2, location=builtin),
           nilExpr())),
@@ -466,6 +470,8 @@ top::Expr ::= e1::Expr e2::Expr
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
+    e1.typerep.strErrors(e1.location, e1.env) ++
+    e2.typerep.strErrors(e2.location, e2.env) ++
     checkStringHeaderDef("equals_string", top.location, top.env);
   
   e2.env = addEnv(e1.defs, e1.env);

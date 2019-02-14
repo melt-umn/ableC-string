@@ -125,7 +125,7 @@ aspect production realType
 top::BuiltinType ::= sub::RealType
 {
   top.showErrors = checkStringHeaderDef("show_float", _, _);
-  top.strErrors = checkStringHeaderDef("str_float", _, _);
+  top.strErrors = checkStringHeaderDef("show_float", _, _);
   top.showProd =
     \ e::Expr ->
       directCallExpr(
@@ -135,7 +135,7 @@ top::BuiltinType ::= sub::RealType
   top.strProd =
     \ e::Expr ->
       directCallExpr(
-        name("str_float", location=builtin),
+        name("show_float", location=builtin),
         consExpr(e, nilExpr()),
         location=builtin);
 }
