@@ -57,7 +57,7 @@ top::Type ::=
       [err(l, s"show is not defined for type ${showType(top)}")];
   top.strErrors =
     \ l::Location Decorated Env ->
-      [err(l, s"show is not defined for type ${showType(top)}")];
+      [err(l, s"str is not defined for type ${showType(top)}")];
   top.showProd = error("Undefined");
   top.strProd = error("Undefined");
 }
@@ -125,7 +125,7 @@ top::BuiltinType ::=
       [err(l, s"show is not defined for type ${showType(builtinType(nilQualifier(), top))}")];
   top.strErrors =
     \ l::Location Decorated Env ->
-      [err(l, s"show is not defined for type ${showType(builtinType(nilQualifier(), top))}")];
+      [err(l, s"str is not defined for type ${showType(builtinType(nilQualifier(), top))}")];
   top.showProd = error("Undefined");
   top.strProd = error("Undefined");
 }
@@ -240,7 +240,7 @@ top::ExtType ::=
       [err(l, s"show is not defined for type ${showType(extType(nilQualifier(), top))}")];
   top.strErrors =
     \ l::Location Decorated Env ->
-      [err(l, s"show is not defined for type ${showType(extType(nilQualifier(), top))}")];
+      [err(l, s"str is not defined for type ${showType(extType(nilQualifier(), top))}")];
   top.showProd = error("Undefined");
   top.strProd = error("Undefined");
 }
