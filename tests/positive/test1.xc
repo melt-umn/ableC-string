@@ -130,7 +130,7 @@ int main(int argc, char **argv) {
 
   string t = str(A);
   printf("t: %s\n", t.text);
-  if (t != "0")
+  if (t != "A")
     return 18;
 
   string u = show(B);

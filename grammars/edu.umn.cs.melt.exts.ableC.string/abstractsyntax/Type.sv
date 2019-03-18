@@ -293,8 +293,8 @@ top::ExtType ::= ref::Decorated EnumDecl
       };
   top.strProd =
     \ e::Expr ->
-      directCallExpr(
-        name("show_int", location=builtin),
-        consExpr(e, nilExpr()),
-        location=builtin);
+      ableC_Expr {
+        ({$directTypeExpr{extType(nilQualifier(), top)} _enum_val = $Expr{e};
+          $Expr{ref.strTransform};})
+      };
 }

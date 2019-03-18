@@ -70,13 +70,16 @@ top::Expr ::= e::Expr
 }
 
 synthesized attribute showTransform::Expr;
+synthesized attribute strTransform::Expr;
 
 attribute showTransform occurs on EnumDecl, EnumItemList;
+attribute strTransform occurs on EnumDecl, EnumItemList;
 
 aspect production enumDecl
 top::EnumDecl ::= name::MaybeName  dcls::EnumItemList
 {
   top.showTransform = dcls.showTransform;
+  top.strTransform = dcls.strTransform;
 }
 
 aspect production consEnumItem
@@ -87,6 +90,12 @@ top::EnumItemList ::= h::EnumItem  t::EnumItemList
       _enum_val == $name{h.name}?
         $Expr{strExpr(mkStringConst(h.name, builtin), location=builtin)} :
         $Expr{t.showTransform}
+    };
+  top.strTransform =
+    ableC_Expr {
+      _enum_val == $name{h.name}?
+        $Expr{strExpr(mkStringConst(h.name, builtin), location=builtin)} :
+        $Expr{t.strTransform}
     };
 }
 
@@ -100,6 +109,10 @@ top::EnumItemList ::=
        (" " +
         (show_int((unsigned)_enum_val) +
          ">")))
+    };
+  top.strTransform =
+    ableC_Expr {
+      show_int((unsigned)_enum_val)
     };
 }
 
