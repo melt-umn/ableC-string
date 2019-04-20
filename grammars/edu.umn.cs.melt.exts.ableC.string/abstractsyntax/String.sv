@@ -6,7 +6,6 @@ imports silver:langutil:pp;
 imports edu:umn:cs:melt:ableC:abstractsyntax:host;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
 imports edu:umn:cs:melt:ableC:abstractsyntax:env;
-imports edu:umn:cs:melt:ableC:abstractsyntax:substitution;
 imports edu:umn:cs:melt:ableC:abstractsyntax:builtins;
 imports edu:umn:cs:melt:ableC:abstractsyntax:overloadable as ovrld;
 --imports edu:umn:cs:melt:ableC:abstractsyntax:debug;
@@ -30,7 +29,6 @@ aspect function getInitialEnvDefs
 abstract production singleArgExtCallExpr
 top::Expr ::= handler::(Expr ::= Expr Location) f::Name a::Exprs
 {
-  propagate substituted;
   top.pp = pp"${f.pp}(${ppImplode(pp", ", a.pps)})";
   local localErrors::[Message] =
     a.errors ++
@@ -47,7 +45,6 @@ top::Expr ::= handler::(Expr ::= Expr Location) f::Name a::Exprs
 abstract production showExpr
 top::Expr ::= e::Expr
 {
-  propagate substituted;
   top.pp = pp"show(${e.pp})";
   
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
@@ -59,7 +56,6 @@ top::Expr ::= e::Expr
 abstract production showCharPointer
 top::Expr ::= e::Expr
 {
-  propagate substituted;
   top.pp = pp"show(${e.pp})";
   
   forwards to
@@ -119,7 +115,6 @@ top::EnumItemList ::=
 abstract production showPointer
 top::Expr ::= e::Expr
 {
-  propagate substituted;
   top.pp = pp"show(${e.pp})";
   
   local subType::Type =
@@ -159,7 +154,6 @@ top::Expr ::= e::Expr
 abstract production showStruct
 top::Expr ::= e::Expr
 {
-  propagate substituted;
   top.pp = pp"show(${e.pp})";
   
   local decl::Decorated StructDecl =
@@ -177,7 +171,6 @@ top::Expr ::= e::Expr
 abstract production showUnion
 top::Expr ::= e::Expr
 {
-  propagate substituted;
   top.pp = pp"show(${e.pp})";
   
   local decl::Decorated UnionDecl =
@@ -360,7 +353,6 @@ top::StructDeclarator ::= msg::[Message]
 abstract production strExpr
 top::Expr ::= e::Expr
 {
-  propagate substituted;
   top.pp = pp"str(${e.pp})";
   
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
@@ -372,7 +364,6 @@ top::Expr ::= e::Expr
 abstract production strCharPointer
 top::Expr ::= e::Expr
 {
-  propagate substituted;
   top.pp = pp"str(${e.pp})";
   
   forwards to
@@ -385,7 +376,6 @@ top::Expr ::= e::Expr
 abstract production assignString
 top::Expr ::= lhs::Expr rhs::Expr
 {
-  propagate substituted;
   top.pp = pp"${lhs.pp} = ${rhs.pp}";
   
   forwards to
@@ -398,7 +388,6 @@ top::Expr ::= lhs::Expr rhs::Expr
 abstract production concatString
 top::Expr ::= e1::Expr e2::Expr
 {
-  propagate substituted;
   top.pp = pp"${e1.pp} + ${e2.pp}";
   
   local localErrors::[Message] =
@@ -424,7 +413,6 @@ top::Expr ::= e1::Expr e2::Expr
 abstract production removeString
 top::Expr ::= e1::Expr e2::Expr
 {
-  propagate substituted;
   top.pp = pp"${e1.pp} - ${e2.pp}";
   
   local localErrors::[Message] =
@@ -450,7 +438,6 @@ top::Expr ::= e1::Expr e2::Expr
 abstract production repeatString
 top::Expr ::= e1::Expr e2::Expr
 {
-  propagate substituted;
   top.pp = pp"${e1.pp} * ${e2.pp}";
   
   local localErrors::[Message] =
@@ -478,7 +465,6 @@ top::Expr ::= e1::Expr e2::Expr
 abstract production equalsString
 top::Expr ::= e1::Expr e2::Expr
 {
-  propagate substituted;
   top.pp = pp"${e1.pp} == ${e2.pp}";
   
   local localErrors::[Message] =
@@ -504,7 +490,6 @@ top::Expr ::= e1::Expr e2::Expr
 abstract production subscriptString
 top::Expr ::= e1::Expr e2::Expr
 {
-  propagate substituted;
   top.pp = pp"${e1.pp}[${e2.pp}]";
   
   local localErrors::[Message] =
@@ -532,7 +517,6 @@ top::Expr ::= e1::Expr e2::Expr
 abstract production callMemberString
 top::Expr ::= lhs::Expr deref::Boolean rhs::Name a::Exprs
 {
-  propagate substituted;
   
   forwards to
     case rhs.name of
@@ -544,7 +528,6 @@ top::Expr ::= lhs::Expr deref::Boolean rhs::Name a::Exprs
 abstract production memberString
 top::Expr ::= lhs::Expr deref::Boolean rhs::Name
 {
-  propagate substituted;
   top.pp = parens(ppConcat([lhs.pp, text(if deref then "->" else "."), rhs.pp]));
 
   local localErrors::[Message] =
@@ -565,7 +548,6 @@ top::Expr ::= lhs::Expr deref::Boolean rhs::Name
 abstract production substringString
 top::Expr ::= e1::Expr a::Exprs
 {
-  propagate substituted;
   top.pp = pp"${e1.pp}.substring(${ppImplode(pp", ", a.pps)}";
   
   a.env = addEnv(e1.defs, e1.env);
