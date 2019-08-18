@@ -70,15 +70,6 @@ top::Type ::=
   top.strProd = \ e::Expr -> errorExpr([], location=builtin);
 }
 
-aspect production completedType
-top::Type ::= t::Type
-{
-  top.showErrors = t.showErrors;
-  top.strErrors = t.strErrors;
-  top.showProd = t.showProd;
-  top.strProd = t.strProd;
-}
-
 aspect production pointerType
 top::Type ::= quals::Qualifiers sub::Type
 {
