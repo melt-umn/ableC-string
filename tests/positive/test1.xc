@@ -3,6 +3,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+enum foo {
+  A, B, C
+};
+
+struct bar {
+  enum foo w;
+  char *x;
+  union {
+    int y;
+    float z;
+  };
+};
+
+struct baz {
+  struct bar h;
+  struct baz *t;
+};
+
 int main(int argc, char **argv) {
   string a = str("abc");
   printf("a: %s\n", a.text);
@@ -82,19 +100,67 @@ int main(int argc, char **argv) {
   string m = show(show("abcd\n\n\\"));
   printf("m: %s\n", m.text);
   if (m != "\"\\\"abcd\\\\n\\\\n\\\\\\\\\\\"\"")
-   return 14;
+    return 14;
 
-  int x;
-  int *y = &x;
+  int nx = 12;
+  int *ny = &nx;
+  int *nz = (int *)0x42;
   
-  string n = show(y);
+  string n = show(ny);
   printf("n: %s\n", n.text);
-  string o = str(y);
+  if (n != "&12")
+    return 15;
+  
+  string o = str(ny);
   printf("o: %s\n", o.text);
-  string p = show(&y);
+  string p = show(&ny);
   printf("p: %s\n", p.text);
-  string q = str(&y);
+  if (p != "&&12")
+    return 16;
+  
+  string q = str(&ny);
   printf("q: %s\n", q.text);
+  string r = show(nz);
+  printf("r: %s\n", r.text);
+  if (r != "<signed int *  at 0x42>")
+    return 17;
+  
+  string s = str(nz);
+  printf("s: %s\n", s.text);
 
+  string t = str(A);
+  printf("t: %s\n", t.text);
+  if (t != "A")
+    return 18;
+
+  string u = show(B);
+  printf("u: %s\n", u.text);
+  if (u != "B")
+    return 19;
+
+  string v = show((enum foo)42);
+  printf("v: %s\n", v.text);
+  if (v != "<enum foo 42>")
+    return 20;
+
+  enum foo foo_C = C;
+  string w = show(&foo_C);
+  printf("w: %s\n", w.text);
+  if (w != "&C")
+    return 21;
+
+  const char *strconst = "foobar";
+  string x = str(strconst);
+  printf("x: %s\n", x.text);
+  if (x != "foobar")
+    return 22;
+
+  struct baz b1 = {{A, "hello", {.y = 42}}, NULL};
+  struct baz b2 = {{B, "world", {.z = 3.14f}}, &b1};
+  string y = show(b2);
+  printf("y: %s\n", y.text);
+  if (y != "{.h = {.w = B, .x = \"world\", {.y = 1078523331, .z = 3.14}}, .t = &{.h = {.w = A, .x = \"hello\", {.y = 42, .z = 5.88545e-44}}, .t = <struct baz *  at 0x0>}}")
+    return 23;
+  
   return 0;
 }
