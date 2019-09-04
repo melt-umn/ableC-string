@@ -6,331 +6,376 @@ imports silver:langutil:pp;
 imports edu:umn:cs:melt:ableC:abstractsyntax:host;
 imports edu:umn:cs:melt:ableC:abstractsyntax:construction;
 imports edu:umn:cs:melt:ableC:abstractsyntax:env;
-imports edu:umn:cs:melt:ableC:abstractsyntax:substitution;
+imports edu:umn:cs:melt:ableC:abstractsyntax:builtins;
 imports edu:umn:cs:melt:ableC:abstractsyntax:overloadable as ovrld;
 --imports edu:umn:cs:melt:ableC:abstractsyntax:debug;
 
-global builtin::Location = builtinLoc("string");
-
-aspect function ovrld:getAddOverloadProd
-Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
+aspect function getInitialEnvDefs
+[Def] ::=
 {
-  lOverloads <-
-    [pair(
-       "edu:umn:cs:melt:exts:ableC:string:string",
-       \ lhs::Expr rhs::Expr loc::Location ->
-         appendString(lhs, strExpr(rhs, location=loc), location=loc))];
-  rOverloads <-
-    [pair(
-       "edu:umn:cs:melt:exts:ableC:string:string",
-       \ lhs::Expr rhs::Expr loc::Location ->
-         appendString(strExpr(lhs, location=loc), rhs, location=loc))];
+  d <-
+    [valueDef(
+       "show",
+       builtinFunctionValueItem(
+         functionType(extType(nilQualifier(), stringType()), noProtoFunctionType(), nilQualifier()),
+         singleArgExtCallExpr(showExpr(_, location=_), _, _, location=_))),
+     valueDef(
+       "str",
+       builtinFunctionValueItem(
+         functionType(extType(nilQualifier(), stringType()), noProtoFunctionType(), nilQualifier()),
+         singleArgExtCallExpr(strExpr(_, location=_), _, _, location=_)))];
 }
 
-aspect function ovrld:getSubOverloadProd
-Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
+abstract production singleArgExtCallExpr
+top::Expr ::= handler::(Expr ::= Expr Location) f::Name a::Exprs
 {
-  lOverloads <-
-    [pair(
-       "edu:umn:cs:melt:exts:ableC:string:string",
-       \ lhs::Expr rhs::Expr loc::Location ->
-         removeString(lhs, strExpr(rhs, location=loc), location=loc))];
-}
-
-aspect function ovrld:getMulOverloadProd
-Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
-{
-  lOverloads <- [pair("edu:umn:cs:melt:exts:ableC:string:string", repeatString(_, _, location=_))];
-}
-
-aspect function ovrld:getEqualsOverloadProd
-Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
-{
-  lOverloads <-
-    [pair(
-       "edu:umn:cs:melt:exts:ableC:string:string",
-       \ lhs::Expr rhs::Expr loc::Location ->
-         eqString(lhs, strExpr(rhs, location=loc), location=loc))];
-  rOverloads <-
-    [pair(
-       "edu:umn:cs:melt:exts:ableC:string:string",
-       \ lhs::Expr rhs::Expr loc::Location ->
-         eqString(strExpr(lhs, location=loc), rhs, location=loc))];
-}
-
-aspect function ovrld:getEqOverloadProd
-Maybe<(Expr ::= Expr Expr Location)> ::= l::Type r::Type env::Decorated Env
-{
-  lOverloads <- [pair("edu:umn:cs:melt:exts:ableC:string:string", assignString(_, _, location=_))];
-}
-
-aspect function ovrld:getMemberCallOverloadProd
-Maybe<(Expr ::= Expr Boolean Name Exprs Location)> ::= t::Type env::Decorated Env
-{
-  overloads <-
-    [pair("edu:umn:cs:melt:exts:ableC:string:string", memberCallString(_, _, _, _, location=_))];
-}
-
-aspect function ovrld:getArraySubscriptOverloadProd
-Maybe<(Expr ::= Expr Expr Location)> ::= t::Type env::Decorated Env
-{
-  overloads <-
-    [pair("edu:umn:cs:melt:exts:ableC:string:string", subscriptString(_, _, location=_))];
-}
-
-aspect function ovrld:getSubscriptAssignOverloadProd
-Maybe<(Expr ::= Expr Expr (Expr ::= Expr Expr Location) Expr Location)> ::= t::Type env::Decorated Env
-{
-  overloads <-
-    [pair(
-       "edu:umn:cs:melt:exts:ableC:string:string",
-       \ l::Expr i::Expr o::(Expr ::= Expr Expr Location) r::Expr loc::Location ->
-         errorExpr([err(loc, "Strings are immutable, cannot assign to index")], location=loc))];
-}
-
-aspect function ovrld:getMemberAssignOverloadProd
-Maybe<(Expr ::= Expr Boolean Name (Expr ::= Expr Expr Location) Expr Location)> ::= t::Type env::Decorated Env
-{
-  overloads <-
-    [pair(
-       "edu:umn:cs:melt:exts:ableC:string:string",
-       \ l::Expr d::Boolean m::Name o::(Expr ::= Expr Expr Location) r::Expr loc::Location ->
-         errorExpr([err(loc, s"Cannot assign to field ${m.name} of string")], location=loc))];
-}
-
-function getShowOverloadProd
-Maybe<(Expr ::= Expr Location)> ::= t::Type env::Decorated Env
-{
-  production attribute overloads::[Pair<String (Expr ::= Expr Location)>] with ++;
-  overloads := [pair("edu:umn:cs:melt:exts:ableC:string:string", showString(_, location=_))];
-  return ovrld:getUnaryOverloadProd(t, env, overloads);
-}
-
-function getStrOverloadProd
-Maybe<(Expr ::= Expr Location)> ::= t::Type env::Decorated Env
-{
-  production attribute overloads::[Pair<String (Expr ::= Expr Location)>] with ++;
-  overloads := [pair("edu:umn:cs:melt:exts:ableC:string:string", strString(_, location=_))];
-  return ovrld:getUnaryOverloadProd(t, env, overloads);
+  top.pp = pp"${f.pp}(${ppImplode(pp", ", a.pps)})";
+  local localErrors::[Message] =
+    a.errors ++
+    if a.count != 1
+    then [err(top.location, s"${f.name} expected only 1 argument, got ${toString(a.count)}")]
+    else [];
+  local fwrd::Expr =
+    case a of
+    | consExpr(e, _) -> handler(decExpr(e, location=e.location), top.location)
+    end;
+  forwards to mkErrorCheck(localErrors, fwrd);
 }
 
 abstract production showExpr
 top::Expr ::= e::Expr
 {
-  propagate substituted;
   top.pp = pp"show(${e.pp})";
   
-  local localErrors::[Message] = e.errors;
-  local fwrd::Expr =
-    fromMaybe(showHost(_, location=_), getShowOverloadProd(e.typerep, top.env))(e, top.location);
-  
-  forwards to mkErrorCheck(localErrors, fwrd);
-}
-
-abstract production strExpr
-top::Expr ::= e::Expr
-{
-  propagate substituted;
-  top.pp = pp"str(${e.pp})";
-  
-  local localErrors::[Message] = e.errors;
-  local fwrd::Expr =
-    fromMaybe(strHost(_, location=_), getStrOverloadProd(e.typerep, top.env))(e, top.location);
-  
-  forwards to mkErrorCheck(localErrors, fwrd);
-}
-
-abstract production showHost
-top::Expr ::= e::Expr
-{
-  propagate substituted;
-  top.pp = pp"show(${e.pp})";
-  
-  local localErrors::[Message] = e.errors;
-  local fwrd::Expr =
-    case e.typerep.showProd of
-      just(p) -> p(e, top.location)
-    | nothing() -> errorExpr([err(e.location, s"show of ${showType(e.typerep)} not defined")], location=top.location)
-    end;
-  forwards to mkErrorCheck(localErrors, fwrd);
-}
-
-abstract production showString
-top::Expr ::= e::Expr
-{
-  propagate substituted;
-  top.pp = pp"show(${e.pp})";
-  
-  local localErrors::[Message] =
-    checkStringHeaderDef("showString", top.location, top.env);
-  local fwrd::Expr =
-    directCallExpr(
-      name("showString", location=builtin),
-      consExpr(e, nilExpr()),
-      location=builtin);
+  local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
+  local localErrors::[Message] = e.errors ++ type.showErrors(e.location, e.env);
+  local fwrd::Expr = type.showProd(decExpr(e, location=builtin));
   forwards to mkErrorCheck(localErrors, fwrd);
 }
 
 abstract production showCharPointer
 top::Expr ::= e::Expr
 {
-  propagate substituted;
   top.pp = pp"show(${e.pp})";
   
-  local localErrors::[Message] =
-    checkStringHeaderDef("showCharPointer", top.location, top.env);
-  local fwrd::Expr =
-    directCallExpr(
-      name("showCharPointer", location=builtin),
-      consExpr(e, nilExpr()),
-      location=builtin);
-  forwards to mkErrorCheck(localErrors, fwrd);
+  forwards to
+    ableC_Expr {
+      // Cast in case argument is const char *
+      show_char_pointer((char *)$Expr{e})
+    };
 }
 
-abstract production showChar
-top::Expr ::= e::Expr
+synthesized attribute showTransform::Expr;
+synthesized attribute strTransform::Expr;
+
+attribute showTransform occurs on EnumDecl, EnumItemList;
+attribute strTransform occurs on EnumDecl, EnumItemList;
+
+aspect production enumDecl
+top::EnumDecl ::= name::MaybeName  dcls::EnumItemList
 {
-  propagate substituted;
-  top.pp = pp"show(${e.pp})";
-  
-  local localErrors::[Message] =
-    checkStringHeaderDef("showChar", top.location, top.env);
-  local fwrd::Expr =
-    directCallExpr(
-      name("showChar", location=builtin),
-      consExpr(e, nilExpr()),
-      location=builtin);
-  forwards to mkErrorCheck(localErrors, fwrd);
+  top.showTransform = dcls.showTransform;
+  top.strTransform = dcls.strTransform;
 }
 
-abstract production showInt
-top::Expr ::= e::Expr
+aspect production consEnumItem
+top::EnumItemList ::= h::EnumItem  t::EnumItemList
 {
-  propagate substituted;
-  top.pp = pp"show(${e.pp})";
-  
-  local localErrors::[Message] =
-    checkStringHeaderDef("showInt", top.location, top.env);
-  local fwrd::Expr =
-    directCallExpr(
-      name("showInt", location=builtin),
-      consExpr(e, nilExpr()),
-      location=builtin);
-  forwards to mkErrorCheck(localErrors, fwrd);
+  top.showTransform =
+    ableC_Expr {
+      _enum_val == $name{h.name}?
+        $Expr{strExpr(mkStringConst(h.name, builtin), location=builtin)} :
+        $Expr{t.showTransform}
+    };
+  top.strTransform =
+    ableC_Expr {
+      _enum_val == $name{h.name}?
+        $Expr{strExpr(mkStringConst(h.name, builtin), location=builtin)} :
+        $Expr{t.strTransform}
+    };
 }
 
-abstract production showFloat
-top::Expr ::= e::Expr
+aspect production nilEnumItem
+top::EnumItemList ::=
 {
-  propagate substituted;
-  top.pp = pp"show(${e.pp})";
-  
-  local localErrors::[Message] =
-    checkStringHeaderDef("showFloat", top.location, top.env);
-  local fwrd::Expr =
-    directCallExpr(
-      name("showFloat", location=builtin),
-      consExpr(e, nilExpr()),
-      location=builtin);
-  forwards to mkErrorCheck(localErrors, fwrd);
+  top.showTransform =
+    ableC_Expr {
+      "<" +
+      ($stringLiteralExpr{showType(top.containingEnum)} +
+       (" " +
+        (show_int((unsigned)_enum_val) +
+         ">")))
+    };
+  top.strTransform =
+    ableC_Expr {
+      show_int((unsigned)_enum_val)
+    };
 }
 
 abstract production showPointer
 top::Expr ::= e::Expr
 {
-  propagate substituted;
   top.pp = pp"show(${e.pp})";
   
-  local localErrors::[Message] =
-    checkStringHeaderDef("_showPointer", top.location, top.env);
-  local fwrd::Expr =
-    directCallExpr(
-      name("_showPointer", location=builtin),
-      consExpr(
-        stringLiteral(s"\"${showType(e.typerep)}\"", location=builtin),
-        consExpr(
-          e,
-          nilExpr())),
-      location=builtin);
-  forwards to mkErrorCheck(localErrors, fwrd);
-}
-
-abstract production strHost
-top::Expr ::= e::Expr
-{
-  propagate substituted;
-  top.pp = pp"str(${e.pp})";
-  
-  local localErrors::[Message] = e.errors;
-  local fwrd::Expr =
-    case e.typerep.strProd of
-      just(p) -> p(e, top.location)
-    | nothing() -> errorExpr([err(e.location, s"str of ${showType(e.typerep)} not defined")], location=top.location)
+  local subType::Type =
+    case e.typerep of
+    | pointerType(_, t) -> t
+    | _ -> errorType()
     end;
-  forwards to mkErrorCheck(localErrors, fwrd);
+  forwards to
+    ableC_Expr {
+      ({$directTypeExpr{e.typerep} _ptr = $Expr{e};
+        $directTypeExpr{subType.withoutTypeQualifiers} _ptr_val;
+        _Bool _illegal = 0;
+        
+        // Hacky way of testing if a pointer can be dereferenced validly
+        // TODO: This isn't remotely thread safe, but I don't know of a better way
+        _set_segv_handler();
+        if (!setjmp(_jump)) {
+          _ptr_val = *_ptr;
+        } else {
+          _illegal = 1;
+        }
+        _clear_segv_handler();
+        
+        !_illegal?
+          "&" + $Expr{
+            -- Preserve locations for error checking
+            showExpr(
+              declRefExpr(name("_ptr_val", location=builtin), location=e.location),
+              location=top.location)} :
+          ({char *_baseTypeName = $stringLiteralExpr{showType(e.typerep)};
+            char *_text = GC_malloc(strlen(_baseTypeName) + 17);
+            sprintf(_text, "<%s at 0x%lx>", _baseTypeName, (unsigned long)_ptr);
+            ($directTypeExpr{extType(nilQualifier(), stringType())}){strlen(_text), _text};});})
+    };
 }
 
-abstract production strString
+abstract production showStruct
 top::Expr ::= e::Expr
 {
-  propagate substituted;
+  top.pp = pp"show(${e.pp})";
+  
+  local decl::Decorated StructDecl =
+    case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
+    | structRefIdItem(decl) :: _ -> decl
+    end;
+  
+  forwards to
+    injectGlobalDeclsExpr(
+      foldDecl([maybeValueDecl(decl.showFnName, decls(decl.showFnDecls))]),
+      ableC_Expr { $name{decl.showFnName}($Expr{e}) },
+      location=builtin);
+}
+
+abstract production showUnion
+top::Expr ::= e::Expr
+{
+  top.pp = pp"show(${e.pp})";
+  
+  local decl::Decorated UnionDecl =
+    case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
+    | unionRefIdItem(decl) :: _ -> decl
+    end;
+  
+  forwards to
+    injectGlobalDeclsExpr(
+      foldDecl([maybeValueDecl(decl.showFnName, decls(decl.showFnDecls))]),
+      ableC_Expr { $name{decl.showFnName}($Expr{e}) },
+      location=builtin);
+}
+
+synthesized attribute showDeclErrors::([Message] ::= Location Decorated Env) occurs on StructDecl, UnionDecl;
+synthesized attribute showFnName::String occurs on StructDecl, UnionDecl;
+synthesized attribute showFnDecls::Decls occurs on StructDecl, UnionDecl;
+attribute showErrors occurs on StructDecl, UnionDecl, StructItemList, StructItem, StructDeclarators, StructDeclarator;
+attribute showTransform occurs on StructDecl, UnionDecl;
+synthesized attribute showTransforms::[Expr] occurs on StructItemList, StructItem, StructDeclarators, StructDeclarator;
+
+global foldShowTransform::(Expr ::= [Expr]) =
+  \ es::[Expr] ->
+    if null(es)
+    then ableC_Expr { "" }
+    else foldr1(\ e1::Expr e2::Expr -> ableC_Expr { $Expr{e1} + ", " + $Expr{e2} }, es);
+
+aspect production structDecl
+top::StructDecl ::= attrs::Attributes  name::MaybeName  dcls::StructItemList
+{
+  local n::String = name.maybename.fromJust.name;
+  top.showDeclErrors =
+    \ l::Location env::Decorated Env ->
+      if !name.maybename.isJust
+      then [err(l, "Cannot show anonymous struct")]
+      else if null(lookupValue(top.showFnName, env))
+      then
+        case top.showErrors(top.location, addEnv([valueDef(top.showFnName, errorValueItem())], env)) of
+        | [] -> []
+        | m -> [nested(l, s"In showing struct ${n}", m)]
+        end
+      else [];
+  top.showFnName = s"_show_${n}";
+  top.showFnDecls =
+    ableC_Decls {
+      static $BaseTypeExpr{stringTypeExpr(nilQualifier(), builtin)} $name{top.showFnName}(struct $name{n});
+      static $BaseTypeExpr{stringTypeExpr(nilQualifier(), builtin)} $name{top.showFnName}(struct $name{n} s) {
+        return $Expr{top.showTransform};
+      }
+    };
+  top.showErrors = dcls.showErrors;
+  top.showTransform = ableC_Expr { "{" + $Expr{foldShowTransform(dcls.showTransforms)} + "}" };
+}
+
+aspect production unionDecl
+top::UnionDecl ::= attrs::Attributes  name::MaybeName  dcls::StructItemList
+{
+  local n::String = name.maybename.fromJust.name;
+  top.showDeclErrors =
+    \ l::Location env::Decorated Env ->
+      if !name.maybename.isJust
+      then [err(l, "Cannot show anonymous union")]
+      else if null(lookupValue(top.showFnName, env))
+      then
+        case top.showErrors(top.location, addEnv([valueDef(top.showFnName, errorValueItem())], env)) of
+        | [] -> []
+        | m -> [nested(l, s"In showing union ${n}", m)]
+        end
+      else [];
+  top.showFnName = s"_show_${n}";
+  top.showFnDecls =
+    ableC_Decls {
+      static $BaseTypeExpr{stringTypeExpr(nilQualifier(), builtin)} $name{top.showFnName}(union $name{n});
+      static $BaseTypeExpr{stringTypeExpr(nilQualifier(), builtin)} $name{top.showFnName}(union $name{n} s) {
+        return $Expr{top.showTransform};
+      }
+    };
+  top.showErrors = dcls.showErrors;
+  top.showTransform = ableC_Expr { "{" + $Expr{foldShowTransform(dcls.showTransforms)} + "}" };
+}
+
+aspect production consStructItem
+top::StructItemList ::= h::StructItem  t::StructItemList
+{
+  top.showErrors =
+    \ l::Location env::Decorated Env -> h.showErrors(l, env) ++ t.showErrors(l, env);
+  top.showTransforms = h.showTransforms ++ t.showTransforms;
+}
+aspect production nilStructItem
+top::StructItemList ::=
+{
+  top.showErrors = \ l::Location env::Decorated Env -> [];
+  top.showTransforms = [];
+}
+
+aspect production structItem
+top::StructItem ::= attrs::Attributes  ty::BaseTypeExpr  dcls::StructDeclarators
+{
+  top.showErrors = dcls.showErrors;
+  top.showTransforms = dcls.showTransforms;
+}
+aspect production structItems
+top::StructItem ::= dcls::StructItemList
+{
+  top.showErrors = dcls.showErrors;
+  top.showTransforms = dcls.showTransforms;
+}
+aspect production anonStructStructItem
+top::StructItem ::= d::StructDecl
+{
+  top.showErrors = d.showErrors;
+  top.showTransforms = [d.showTransform];
+}
+aspect production anonUnionStructItem
+top::StructItem ::= d::UnionDecl
+{
+  top.showErrors = d.showErrors;
+  top.showTransforms = [d.showTransform];
+}
+aspect production warnStructItem
+top::StructItem ::= msg::[Message]
+{
+  top.showErrors = \ l::Location env::Decorated Env -> [];
+  top.showTransforms = [];
+}
+
+aspect production consStructDeclarator
+top::StructDeclarators ::= h::StructDeclarator  t::StructDeclarators
+{
+  top.showErrors =
+    \ l::Location env::Decorated Env -> h.showErrors(l, env) ++ t.showErrors(l, env);
+  top.showTransforms = h.showTransforms ++ t.showTransforms;
+}
+aspect production nilStructDeclarator
+top::StructDeclarators ::=
+{
+  top.showErrors = \ l::Location env::Decorated Env -> [];
+  top.showTransforms = [];
+}
+
+aspect production structField
+top::StructDeclarator ::= name::Name  ty::TypeModifierExpr  attrs::Attributes
+{
+  top.showErrors =
+    \ Location env::Decorated Env -> top.typerep.showErrors(top.sourceLocation, env);
+  top.showTransforms =
+    [ableC_Expr {
+       $stringLiteralExpr{"." ++ name.name ++ " = "} +
+         $Expr{
+           showExpr(
+             parenExpr(ableC_Expr { s.$Name{name} }, location=name.location),
+             location=name.location)}
+     }];
+}
+aspect production structBitfield
+top::StructDeclarator ::= name::MaybeName  ty::TypeModifierExpr  e::Expr  attrs::Attributes
+{
+  top.showErrors =
+    \ Location env::Decorated Env -> top.typerep.showErrors(top.sourceLocation, env);
+  top.showTransforms =
+    case name of
+    | justName(n) ->
+     [ableC_Expr {
+         $stringLiteralExpr{"." ++ n.name ++ " = "} +
+           $Expr{
+             showExpr(
+               parenExpr(ableC_Expr { s.$Name{n} }, location=n.location),
+               location=n.location)}
+       }]
+    | nothingName() -> []
+    end;
+}
+aspect production warnStructField
+top::StructDeclarator ::= msg::[Message]
+{
+  top.showErrors = \ l::Location env::Decorated Env -> [];
+  top.showTransforms = [];
+}
+
+abstract production strExpr
+top::Expr ::= e::Expr
+{
   top.pp = pp"str(${e.pp})";
   
-  forwards to e;
+  local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
+  local localErrors::[Message] = e.errors ++ type.strErrors(e.location, e.env);
+  local fwrd::Expr = type.strProd(decExpr(e, location=builtin));
+  forwards to mkErrorCheck(localErrors, fwrd);
 }
 
 abstract production strCharPointer
 top::Expr ::= e::Expr
 {
-  propagate substituted;
   top.pp = pp"str(${e.pp})";
   
-  local localErrors::[Message] =
-    checkStringHeaderDef("strCharPointer", top.location, top.env);
-  local fwrd::Expr =
-    directCallExpr(
-      name("strCharPointer", location=builtin),
-      consExpr(e, nilExpr()),
-      location=builtin);
-  forwards to mkErrorCheck(localErrors, fwrd);
-}
-
-abstract production strChar
-top::Expr ::= e::Expr
-{
-  propagate substituted;
-  top.pp = pp"str(${e.pp})";
-  
-  local localErrors::[Message] =
-    checkStringHeaderDef("strChar", top.location, top.env);
-  local fwrd::Expr =
-    directCallExpr(
-      name("strChar", location=builtin),
-      consExpr(e, nilExpr()),
-      location=builtin);
-  forwards to mkErrorCheck(localErrors, fwrd);
-}
-
-abstract production strPointer
-top::Expr ::= e::Expr
-{
-  propagate substituted;
-  top.pp = pp"str(${e.pp})";
-  
-  local localErrors::[Message] =
-    checkStringHeaderDef("strPointer", top.location, top.env);
-  local fwrd::Expr =
-    directCallExpr(
-      name("strPointer", location=builtin),
-      consExpr(e, nilExpr()),
-      location=builtin);
-  forwards to mkErrorCheck(localErrors, fwrd);
+  forwards to
+    ableC_Expr {
+      // Cast in case argument is const char *
+      str_char_pointer((char *)$Expr{e})
+    };
 }
 
 abstract production assignString
 top::Expr ::= lhs::Expr rhs::Expr
 {
-  propagate substituted;
   top.pp = pp"${lhs.pp} = ${rhs.pp}";
   
   forwards to
@@ -340,21 +385,26 @@ top::Expr ::= lhs::Expr rhs::Expr
       location=builtin);
 }
 
-abstract production appendString
+abstract production concatString
 top::Expr ::= e1::Expr e2::Expr
 {
-  propagate substituted;
   top.pp = pp"${e1.pp} + ${e2.pp}";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("_append_string", top.location, top.env);
+    e1.errors ++ e2.errors ++
+    e1.typerep.strErrors(e1.location, e1.env) ++
+    e2.typerep.strErrors(e2.location, e2.env) ++
+    checkStringHeaderDef("concat_string", top.location, top.env);
+  
+  e2.env = addEnv(e1.defs, e1.env);
+  
   local fwrd::Expr =
     directCallExpr(
-      name("_append_string", location=builtin),
+      name("concat_string", location=builtin),
       consExpr(
-        strExpr(e1, location=builtin),
+        strExpr(decExpr(e1, location=builtin), location=builtin),
         consExpr(
-          strExpr(e2, location=builtin),
+          strExpr(decExpr(e2, location=builtin), location=builtin),
           nilExpr())),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -363,18 +413,23 @@ top::Expr ::= e1::Expr e2::Expr
 abstract production removeString
 top::Expr ::= e1::Expr e2::Expr
 {
-  propagate substituted;
   top.pp = pp"${e1.pp} - ${e2.pp}";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("_remove_string", top.location, top.env);
+    e1.errors ++ e2.errors ++
+    e1.typerep.strErrors(e1.location, e1.env) ++
+    e2.typerep.strErrors(e2.location, e2.env) ++
+    checkStringHeaderDef("remove_string", top.location, top.env);
+  
+  e2.env = addEnv(e1.defs, e1.env);
+  
   local fwrd::Expr =
     directCallExpr(
-      name("_remove_string", location=builtin),
+      name("remove_string", location=builtin),
       consExpr(
-        strExpr(e1, location=builtin),
+        strExpr(decExpr(e1, location=builtin), location=builtin),
         consExpr(
-          strExpr(e2, location=builtin),
+          strExpr(decExpr(e2, location=builtin), location=builtin),
           nilExpr())),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
@@ -383,34 +438,51 @@ top::Expr ::= e1::Expr e2::Expr
 abstract production repeatString
 top::Expr ::= e1::Expr e2::Expr
 {
-  propagate substituted;
   top.pp = pp"${e1.pp} * ${e2.pp}";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("_repeat_string", top.location, top.env) ++
+    e1.errors ++ e2.errors ++
+    checkStringHeaderDef("repeat_string", top.location, top.env) ++
+    checkStringType(e1.typerep, "*", top.location) ++
     if e2.typerep.isIntegerType
     then []
-    else [err(e2.location, s"String repeat must have integer type, but got ${showType(e2.typerep)}")];
+    else [err(e2.location, s"string repeat must have integer type, but got ${showType(e2.typerep)}")];
+  
+  e2.env = addEnv(e1.defs, e1.env);
+  
   local fwrd::Expr =
     directCallExpr(
-      name("_repeat_string", location=builtin),
-      consExpr(e1, consExpr(e2, nilExpr())),
+      name("repeat_string", location=builtin),
+      consExpr(
+        decExpr(e1, location=builtin),
+        consExpr(
+          decExpr(e2, location=builtin),
+          nilExpr())),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
 }
 
-abstract production eqString
+abstract production equalsString
 top::Expr ::= e1::Expr e2::Expr
 {
-  propagate substituted;
   top.pp = pp"${e1.pp} == ${e2.pp}";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("_eq_string", top.location, top.env);
+    e1.errors ++ e2.errors ++
+    e1.typerep.strErrors(e1.location, e1.env) ++
+    e2.typerep.strErrors(e2.location, e2.env) ++
+    checkStringHeaderDef("equals_string", top.location, top.env);
+  
+  e2.env = addEnv(e1.defs, e1.env);
+  
   local fwrd::Expr =
     directCallExpr(
-      name("_eq_string", location=builtin),
-      consExpr(e1, consExpr(e2, nilExpr())),
+      name("equals_string", location=builtin),
+      consExpr(
+        strExpr(decExpr(e1, location=builtin), location=builtin),
+        consExpr(
+          strExpr(decExpr(e2, location=builtin), location=builtin),
+          nilExpr())),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
 }
@@ -418,40 +490,67 @@ top::Expr ::= e1::Expr e2::Expr
 abstract production subscriptString
 top::Expr ::= e1::Expr e2::Expr
 {
-  propagate substituted;
   top.pp = pp"${e1.pp}[${e2.pp}]";
   
   local localErrors::[Message] =
-    checkStringHeaderDef("_index_string", top.location, top.env) ++
+    e1.errors ++ e2.errors ++
+    checkStringHeaderDef("subscript_string", top.location, top.env) ++
+    checkStringType(e1.typerep, "[]", top.location) ++
     if e2.typerep.isIntegerType
     then []
-    else [err(e2.location, s"String index must have integer type, but got ${showType(e2.typerep)}")];
+    else [err(e2.location, s"string index must have integer type, but got ${showType(e2.typerep)}")];
+  
+  e2.env = addEnv(e1.defs, e1.env);
+  
   local fwrd::Expr =
     directCallExpr(
-      name("_index_string", location=builtin),
-      consExpr(e1, consExpr(e2, nilExpr())),
+      name("subscript_string", location=builtin),
+      consExpr(
+        strExpr(decExpr(e1, location=builtin), location=builtin),
+        consExpr(
+          decExpr(e2, location=builtin),
+          nilExpr())),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
 }
 
-abstract production memberCallString
+abstract production callMemberString
 top::Expr ::= lhs::Expr deref::Boolean rhs::Name a::Exprs
 {
-  propagate substituted;
   
   forwards to
-    case deref, rhs.name of
-      _, "substring" -> substringString(lhs, a, location=top.location)
-    | _, n -> errorExpr([err(rhs.location, s"String does not have field ${n}")], location=top.location)
+    case rhs.name of
+      "substring" -> substringString(lhs, a, location=top.location)
+    | n -> errorExpr([err(rhs.location, s"string does not have field ${n}")], location=builtin)
     end;
+}
+
+abstract production memberString
+top::Expr ::= lhs::Expr deref::Boolean rhs::Name
+{
+  top.pp = parens(ppConcat([lhs.pp, text(if deref then "->" else "."), rhs.pp]));
+
+  local localErrors::[Message] =
+    (if !null(lookupRefId("edu:umn:cs:melt:exts:ableC:string:string", top.env))
+     then []
+     else [err(top.location, "Missing include of string.xh")]) ++
+    checkStringType(lhs.typerep, ".", top.location) ++
+    (if rhs.name == "length" || rhs.name == "text"
+     then []
+     else [err(rhs.location, s"string does not have member ${rhs.name}")]);
+  local fwrd::Expr =
+    ableC_Expr {
+      ((const struct _string_s)$Expr{decExpr(lhs, location=builtin)}).$Name{rhs}
+    };
+  forwards to mkErrorCheck(localErrors, fwrd);
 }
 
 abstract production substringString
 top::Expr ::= e1::Expr a::Exprs
 {
-  propagate substituted;
   top.pp = pp"${e1.pp}.substring(${ppImplode(pp", ", a.pps)}";
   
+  a.env = addEnv(e1.defs, e1.env);
   a.expectedTypes = -- size_t
     [builtinType(nilQualifier(), unsignedType(longType())),
      builtinType(nilQualifier(), unsignedType(longType()))];
@@ -459,12 +558,14 @@ top::Expr ::= e1::Expr a::Exprs
   a.callExpr = top; -- Doesn't really matter, just needs location
   a.callVariadic = false;
   local localErrors::[Message] =
-    checkStringHeaderDef("_substring", top.location, top.env) ++
+    e1.errors ++ a.errors ++
+    checkStringHeaderDef("substring", top.location, top.env) ++
+    checkStringType(e1.typerep, "substring", top.location) ++
     a.argumentErrors;
   local fwrd::Expr =
     directCallExpr(
-      name("_substring", location=builtin),
-      consExpr(e1, a),
+      name("substring", location=builtin),
+      consExpr(decExpr(e1, location=builtin), a),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
 }
@@ -478,3 +579,15 @@ function checkStringHeaderDef
     then []
     else [err(loc, "Missing include of string.xh")];
 }
+
+-- Check that operand has string type
+function checkStringType
+[Message] ::= t::Type op::String loc::Location
+{
+  return
+    if typeAssignableTo(extType(nilQualifier(), stringType()), t)
+    then []
+    else [err(loc, s"Operand to ${op} expected string type (got ${showType(t)})")];
+}
+
+global builtin::Location = builtinLoc("string");
