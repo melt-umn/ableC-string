@@ -390,24 +390,29 @@ top::Expr ::= e1::Expr e2::Expr
 {
   top.pp = pp"${e1.pp} + ${e2.pp}";
   
-  local localErrors::[Message] =
-    e1.errors ++ e2.errors ++
-    e1.typerep.strErrors(e1.location, e1.env) ++
-    e2.typerep.strErrors(e2.location, e2.env) ++
-    checkStringHeaderDef("concat_string", top.location, top.env);
-  
   e2.env = addEnv(e1.defs, e1.env);
   
   local fwrd::Expr =
-    directCallExpr(
-      name("concat_string", location=builtin),
-      consExpr(
-        strExpr(decExpr(e1, location=builtin), location=builtin),
-        consExpr(
-          strExpr(decExpr(e2, location=builtin), location=builtin),
-          nilExpr())),
-      location=builtin);
-  forwards to mkErrorCheck(localErrors, fwrd);
+    ableC_Expr { concat_string(str($Expr{e1}), str($Expr{e2})) };
+  fwrd.env = top.env;
+  fwrd.returnType = top.returnType;
+  
+  local e1Dec::Decorated Expr =
+    case fwrd of
+    | ableC_Expr { concat_string(str($Expr e1Dec), str($Expr e2Dec)) } -> e1Dec
+    end;
+  local e2Dec::Decorated Expr =
+    case fwrd of
+    | ableC_Expr { concat_string(str($Expr e1Dec), str($Expr e2Dec)) } -> e2Dec
+    end;
+  
+  local localErrors::[Message] =
+    e1Dec.errors ++ e2Dec.errors ++
+    e1Dec.typerep.strErrors(e1.location, e1Dec.env) ++
+    e2Dec.typerep.strErrors(e2.location, e2Dec.env) ++
+    checkStringHeaderDef("concat_string", top.location, top.env);
+  
+  forwards to mkErrorCheck(localErrors, decExpr(fwrd, location=fwrd.location));
 }
 
 abstract production removeString
