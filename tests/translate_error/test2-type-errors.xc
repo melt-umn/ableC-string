@@ -27,5 +27,8 @@ int main(int argc, char **argv) {
 
   str(1, 3.14); // Wrong number of arguments
 
+  string f = c + foo;
+  string g = c + asdfasdf;
+
   return 0;
 }
