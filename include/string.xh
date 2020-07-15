@@ -102,39 +102,39 @@ static inline string show_string(string s) {
   for (size_t i = 0; i < s.length; i++) {
     char *tmp;
     switch (s[i]) {
-    case '\a':
-      result[resultIndex++] = '\\';
-      result[resultIndex++] = 'a';
-      break;
-    case '\b':
-      result[resultIndex++] = '\\';
-      result[resultIndex++] = 'b';
-      break;
-    case '\n':
-      result[resultIndex++] = '\\';
-      result[resultIndex++] = 'n';
-      break;
-    case '\r':
-      result[resultIndex++] = '\\';
-      result[resultIndex++] = 'r';
-      break;
-    case '\t':
-      result[resultIndex++] = '\\';
-      result[resultIndex++] = 't';
-      break;
-    case '\v':
-      result[resultIndex++] = '\\';
-      result[resultIndex++] = 'v';
-      break;
-    case '\"':
-  //case '\'':
-    case '\\':
-  //case '\?':
-      result[resultIndex++] = '\\';
-      result[resultIndex++] = s[i];
-      break;
-    default:
-      result[resultIndex++] = s[i];
+      case '\a':
+        result[resultIndex++] = '\\';
+        result[resultIndex++] = 'a';
+        break;
+      case '\b':
+        result[resultIndex++] = '\\';
+        result[resultIndex++] = 'b';
+        break;
+      case '\n':
+        result[resultIndex++] = '\\';
+        result[resultIndex++] = 'n';
+        break;
+      case '\r':
+        result[resultIndex++] = '\\';
+        result[resultIndex++] = 'r';
+        break;
+      case '\t':
+        result[resultIndex++] = '\\';
+        result[resultIndex++] = 't';
+        break;
+      case '\v':
+        result[resultIndex++] = '\\';
+        result[resultIndex++] = 'v';
+        break;
+      case '\"':
+    //case '\'':
+      case '\\':
+    //case '\?':
+        result[resultIndex++] = '\\';
+        result[resultIndex++] = s[i];
+        break;
+      default:
+        result[resultIndex++] = s[i];
     }
   }
   result[resultIndex++] = '\"';
@@ -160,9 +160,48 @@ static inline string show_float(double f) {
 }
 
 static inline string show_char(char c) {
-  char *result = GC_malloc(4);
-  sprintf((char*)result, "'%c'", c);
-  return (string){strlen(result), result};
+  char *result = GC_malloc(5); // Worst-case size, if char is escaped
+  result[0] = '\'';
+  size_t resultIndex = 1;
+  switch (c) {
+    case '\a':
+      result[resultIndex++] = '\\';
+      result[resultIndex++] = 'a';
+      break;
+    case '\b':
+      result[resultIndex++] = '\\';
+      result[resultIndex++] = 'b';
+      break;
+    case '\n':
+      result[resultIndex++] = '\\';
+      result[resultIndex++] = 'n';
+      break;
+    case '\r':
+      result[resultIndex++] = '\\';
+      result[resultIndex++] = 'r';
+      break;
+    case '\t':
+      result[resultIndex++] = '\\';
+      result[resultIndex++] = 't';
+      break;
+    case '\v':
+      result[resultIndex++] = '\\';
+      result[resultIndex++] = 'v';
+      break;
+    case '\"':
+    case '\'':
+    case '\\':
+  //case '\?':
+      result[resultIndex++] = '\\';
+      result[resultIndex++] = c;
+      break;
+    default:
+      result[resultIndex++] = c;
+  }
+  result[resultIndex++] = '\'';
+  result[resultIndex] = '\0';
+
+  return (string){resultIndex, result};
 }
 
 // Hacky way of testing if a pointer can be dereferenced validly

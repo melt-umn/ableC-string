@@ -161,6 +161,11 @@ int main(int argc, char **argv) {
   printf("y: %s\n", y.text);
   if (y != "{.h = {.w = B, .x = \"world\", {.y = 1078523331, .z = 3.14}}, .t = &{.h = {.w = A, .x = \"hello\", {.y = 42, .z = 5.88545e-44}}, .t = <struct baz *  at 0x0>}}")
     return 23;
+
+  string z = show('\n');
+  printf("z: %s\n", z.text);
+  if (z != "'\\n'")
+    return 24;
   
   return 0;
 }
