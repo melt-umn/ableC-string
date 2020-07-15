@@ -127,7 +127,7 @@ static inline string show_string(string s) {
       result[resultIndex++] = 'v';
       break;
     case '\"':
-    case '\'':
+  //case '\'':
     case '\\':
   //case '\?':
       result[resultIndex++] = '\\';
