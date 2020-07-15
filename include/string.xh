@@ -61,7 +61,7 @@ static inline string remove_string(string s1, string s2) {
     }
   }
   result[j] = '\0';
-  
+
   return (string){j, result};
 }
 
@@ -129,7 +129,7 @@ static inline string show_string(string s) {
     case '\"':
     case '\'':
     case '\\':
-    case '\?':
+  //case '\?':
       result[resultIndex++] = '\\';
       result[resultIndex++] = s[i];
       break;
@@ -139,7 +139,7 @@ static inline string show_string(string s) {
   }
   result[resultIndex++] = '\"';
   result[resultIndex] = '\0';
-  
+
   return (string){resultIndex, result};
 }
 
