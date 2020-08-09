@@ -147,6 +147,11 @@ static inline string show_char_pointer(char *s) {
   return show_string(str_char_pointer(s));
 }
 
+static inline string show_bool(_Bool b) {
+  char *result = b? "true" : "false";
+  return (string){strlen(result), result};
+}
+
 static inline string show_int(int i) {
   char *result = GC_malloc((CHAR_BIT * sizeof(i) - 1) / 3 + 2);
   sprintf(result, "%d", i);

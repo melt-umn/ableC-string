@@ -120,6 +120,25 @@ top::BuiltinType ::=
   top.strProd = error("Undefined");
 }
 
+aspect production boolType
+top::BuiltinType ::=
+{
+  top.showErrors = checkStringHeaderDef("show_bool", _, _);
+  top.strErrors = checkStringHeaderDef("show_bool", _, _);
+  top.showProd =
+    \ e::Expr ->
+      directCallExpr(
+        name("show_bool", location=builtin),
+        consExpr(e, nilExpr()),
+        location=builtin);
+  top.strProd =
+    \ e::Expr ->
+      directCallExpr(
+        name("show_bool", location=builtin),
+        consExpr(e, nilExpr()),
+        location=builtin);
+}
+
 aspect production realType
 top::BuiltinType ::= sub::RealType
 {
