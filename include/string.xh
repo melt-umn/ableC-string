@@ -36,7 +36,7 @@ static inline string concat_string(string s1, string s2) {
   char *result = GC_malloc(s1.length + s2.length + 1); // + 1 for NULL char
   strcpy(result, s1.text);
   strcat(result, s2.text);
-  return (string){s1.length + s2.length, result};
+  return (string)(struct _string_s){s1.length + s2.length, result};
 }
 
 static inline string repeat_string(string s, size_t num) {
@@ -45,7 +45,7 @@ static inline string repeat_string(string s, size_t num) {
   size_t i;
   for (size_t i = 0; i < num; i++)
     strcat(result, s.text);
-  return (string){s.length * num, result};
+  return (string)(struct _string_s){s.length * num, result};
 }
 
 static inline string remove_string(string s1, string s2) {
@@ -62,7 +62,7 @@ static inline string remove_string(string s1, string s2) {
   }
   result[j] = '\0';
 
-  return (string){j, result};
+  return (string)(struct _string_s){j, result};
 }
 
 static inline string substring(string s, size_t start, size_t end) {
@@ -72,27 +72,27 @@ static inline string substring(string s, size_t start, size_t end) {
   }
   char *result = GC_malloc(end - start + 1);
   strncpy(result, s.text + start, end - start);
-  return (string){end - start, result};
+  return (string)(struct _string_s){end - start, result};
 }
 
 static inline string str_char_pointer(char *s) {
   size_t len = strlen(s);
   char *result = GC_malloc(len + 1);
   strcpy(result, s);
-  return (string){len, result};
+  return (string)(struct _string_s){len, result};
 }
 
 static inline string str_char(char c) {
   char *result = GC_malloc(2);
   result[0] = c;
   result[1] = '\0';
-  return (string){1, result};
+  return (string)(struct _string_s){1, result};
 }
 
 static inline string str_pointer(void *ptr) {
   char *result = GC_malloc(9);
   sprintf(result, "%lx", (unsigned long)ptr);
-  return (string){strlen(result), result};
+  return (string)(struct _string_s){strlen(result), result};
 }
 
 static inline string show_string(string s) {
@@ -140,7 +140,7 @@ static inline string show_string(string s) {
   result[resultIndex++] = '\"';
   result[resultIndex] = '\0';
 
-  return (string){resultIndex, result};
+  return (string)(struct _string_s){resultIndex, result};
 }
 
 static inline string show_char_pointer(char *s) {
@@ -149,19 +149,19 @@ static inline string show_char_pointer(char *s) {
 
 static inline string show_bool(_Bool b) {
   char *result = b? "true" : "false";
-  return (string){strlen(result), result};
+  return (string)(struct _string_s){strlen(result), result};
 }
 
 static inline string show_int(int i) {
   char *result = GC_malloc((CHAR_BIT * sizeof(i) - 1) / 3 + 2);
   sprintf(result, "%d", i);
-  return (string){strlen(result), result};
+  return (string)(struct _string_s){strlen(result), result};
 }
 
 static inline string show_float(double f) {
   char *result = GC_malloc((CHAR_BIT * sizeof(f) - 1) / 3 + 2);
   sprintf((char*)result, "%g", f);
-  return (string){strlen(result), result};
+  return (string)(struct _string_s){strlen(result), result};
 }
 
 static inline string show_char(char c) {
@@ -206,7 +206,7 @@ static inline string show_char(char c) {
   result[resultIndex++] = '\'';
   result[resultIndex] = '\0';
 
-  return (string){resultIndex, result};
+  return (string)(struct _string_s){resultIndex, result};
 }
 
 // Hacky way of testing if a pointer can be dereferenced validly

@@ -41,6 +41,7 @@ top::ExtType ::=
     just(\ Expr Expr loc::Location -> errorExpr([err(loc, "strings are immutable, cannot assign to index")], location=loc));
   top.callMemberProd = just(callMemberString(_, _, _, _, location=_));
   top.memberProd = just(memberString(_, _, _, location=_));
+  top.exprInitProd = just(initString(_, location=_));
 }
 
 synthesized attribute showErrors::([Message] ::= Location Decorated Env) occurs on Type, BuiltinType, ExtType;
