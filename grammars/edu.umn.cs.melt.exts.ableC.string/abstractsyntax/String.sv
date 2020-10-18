@@ -147,7 +147,7 @@ top::Expr ::= e::Expr
           ({char *_baseTypeName = $stringLiteralExpr{showType(e.typerep)};
             char *_text = GC_malloc(strlen(_baseTypeName) + 17);
             sprintf(_text, "<%s at 0x%lx>", _baseTypeName, (unsigned long)_ptr);
-            ($directTypeExpr{extType(nilQualifier(), stringType())}){strlen(_text), _text};});})
+            ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){strlen(_text), _text};});})
     };
 }
 
@@ -568,6 +568,12 @@ top::Expr ::= e1::Expr a::Exprs
       consExpr(decExpr(e1, location=builtin), a),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
+}
+
+abstract production initString
+top::Initializer ::= e::Expr
+{
+  forwards to exprInitializer(strExpr(e, location=top.location), location=top.location);
 }
 
 -- Check the given env for the given function name

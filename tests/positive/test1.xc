@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
 
   string b = str("def");
   printf("b: %s\n", b.text);
-  string c = str("ghi");
+  string c = "ghi";
   printf("c: %s\n", c.text);
   string d = a + b;
   printf("d: %s\n", d.text);
@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
   if (f != "-12345")
     return 6;
 
-  string g = str("xyz");
+  string g = "xyz";
   string h = g * 5;
   printf("h: %s\n", h.text);
 
