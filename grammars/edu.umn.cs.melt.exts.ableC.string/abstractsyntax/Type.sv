@@ -20,8 +20,8 @@ top::ExtType ::=
   top.host =
     extType(
       top.givenQualifiers,
-      refIdExtType(structSEU(), "_string_s",
-      s"edu:umn:cs:melt:exts:ableC:string:string"));
+      refIdExtType(structSEU(), just("_string_s"),
+        s"edu:umn:cs:melt:exts:ableC:string:string"));
   top.mangledName = "string";
   top.isEqualTo =
     \ other::ExtType -> case other of stringType() -> true | _ -> false end;
@@ -270,7 +270,7 @@ top::ExtType ::=
 }
 
 aspect production refIdExtType
-top::ExtType ::= kwd::StructOrEnumOrUnion  n::String  refId::String
+top::ExtType ::= kwd::StructOrEnumOrUnion  mn::Maybe<String>  refId::String
 {
   local topType::Type = extType(top.givenQualifiers, top);
   top.showErrors =
@@ -279,8 +279,8 @@ top::ExtType ::= kwd::StructOrEnumOrUnion  n::String  refId::String
       case kwd, lookupRefId(refId, globalEnv(env)) of
       | structSEU(), structRefIdItem(decl) :: _ -> decl.showDeclErrors(l, env)
       | unionSEU(), unionRefIdItem(decl) :: _ -> decl.showDeclErrors(l, env)
-      | structSEU(), _ -> [err(l, s"struct ${n} does not have a (global) definition.")]
-      | unionSEU(), _ -> [err(l, s"union ${n} does not have a (global) definition.")]
+      | structSEU(), _ -> [err(l, s"struct ${tagName} does not have a (global) definition.")]
+      | unionSEU(), _ -> [err(l, s"union ${tagName} does not have a (global) definition.")]
       | _, _ -> error("Unexpected refIdExtType")
       end;
   top.showProd =
