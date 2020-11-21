@@ -49,7 +49,11 @@ top::Expr ::= e::Expr
   
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
   local localErrors::[Message] = e.errors ++ type.showErrors(e.location, e.env);
-  local fwrd::Expr = type.showProd(decExpr(e, location=builtin));
+  local fwrd::Expr =
+    case getCustomShow(type, top.env) of
+    | just(func) -> ableC_Expr{ $func($e) }
+    | nothing() -> type.showProd(decExpr(e, location=builtin))
+    end;
   forwards to mkErrorCheck(localErrors, fwrd);
 }
 
