@@ -48,11 +48,17 @@ top::Expr ::= e::Expr
   top.pp = pp"show(${e.pp})";
   
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
-  local localErrors::[Message] = e.errors ++ type.showErrors(e.location, e.env);
+  local decE::Expr = decExpr(e, location=builtin);
+  local customShow::Maybe<Name> = getCustomShow(type, top.env);
+  local localErrors::[Message] = e.errors ++
+    case customShow of
+    | just(_) -> []
+    | nothing() -> type.showErrors(e.location, e.env)
+    end;
   local fwrd::Expr =
-    case getCustomShow(type, top.env) of
-    | just(func) -> ableC_Expr{ $func($e) }
-    | nothing() -> type.showProd(decExpr(e, location=builtin))
+    case customShow of
+    | just(func) -> ableC_Expr{ $Name{func}($Expr{decE}) }
+    | nothing() -> type.showProd(decE)
     end;
   forwards to mkErrorCheck(localErrors, fwrd);
 }
