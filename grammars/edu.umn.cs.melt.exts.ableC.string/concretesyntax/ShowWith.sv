@@ -12,20 +12,16 @@ concrete productions top::Declaration_c
 | 'show' id::TypeName_t 'with' show::Identifier_t
     { local ty::TypeName = typeName(typedefTypeExpr(nilQualifier(), fromTy(id)), baseTypeExpr());
       top.ast = showWithDecl(ty, fromId(show)); }
-| 'show' kwd::StructOrEnumOrUnionKeyword_c id::TypeName_t 'with' show::Identifier_t
-    { local ty::TypeName = typeName(kwd.lookupType(id), baseTypeExpr());
+| 'show' kwd::TagKeyword_c id::TypeName_t 'with' show::Identifier_t
+    { local ty::TypeName = typeName(kwd.ast(fromTy(id)), baseTypeExpr());
       top.ast = showWithDecl(ty, fromId(show)); }
 
-synthesized attribute lookupType :: (BaseTypeExpr ::= TypeName_t);
-nonterminal StructOrEnumOrUnionKeyword_c with lookupType;
+closed nonterminal TagKeyword_c with ast<(BaseTypeExpr ::= Name)>;
 
-concrete productions top::StructOrEnumOrUnionKeyword_c
+concrete productions top::TagKeyword_c
 | 'enum'
-    { top.lookupType = \id::TypeName_t ->
-        tagReferenceTypeExpr(nilQualifier(), enumSEU(), fromTy(id)); }
+    { top.ast = tagReferenceTypeExpr(nilQualifier(), enumSEU(), _); }
 | 'struct'
-    { top.lookupType = \id::TypeName_t ->
-        tagReferenceTypeExpr(nilQualifier(), structSEU(), fromTy(id)); }
+    { top.ast = tagReferenceTypeExpr(nilQualifier(), structSEU(), _); }
 | 'union'
-    { top.lookupType = \id::TypeName_t ->
-        tagReferenceTypeExpr(nilQualifier(), unionSEU(), fromTy(id)); }
+    { top.ast = tagReferenceTypeExpr(nilQualifier(), unionSEU(), _); }
