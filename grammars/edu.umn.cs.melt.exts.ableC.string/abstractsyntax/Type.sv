@@ -76,7 +76,7 @@ top::Type ::= quals::Qualifiers sub::Type
 {
   top.showErrors =
     \ l::Location env::Decorated Env ->
-      checkStringHeaderDef("show_char_pointer", l, env) ++ sub.showErrors(l, env);
+      checkStringHeaderDef("show_char_pointer", l, env) ++ showErrors(l, env, sub);
   top.strErrors =
     \ l::Location env::Decorated Env ->
       checkStringHeaderDef("str_char_pointer", l, env) ++ sub.strErrors(l, env);

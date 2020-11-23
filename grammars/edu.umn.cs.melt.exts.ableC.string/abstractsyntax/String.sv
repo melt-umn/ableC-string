@@ -48,19 +48,22 @@ top::Expr ::= e::Expr
   top.pp = pp"show(${e.pp})";
   
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
-  local decE::Expr = decExpr(e, location=builtin);
-  local customShow::Maybe<Name> = getCustomShow(type, top.env);
-  local localErrors::[Message] = e.errors ++
-    case customShow of
-    | just(_) -> []
-    | nothing() -> type.showErrors(e.location, e.env)
-    end;
+  local localErrors::[Message] = e.errors ++ showErrors(e.location, e.env, type);
   local fwrd::Expr =
-    case customShow of
-    | just(func) -> ableC_Expr{ $Name{func}($Expr{decE}) }
-    | nothing() -> type.showProd(decE)
+    case getCustomShow(type, top.env) of
+    | just(func) -> ableC_Expr{ $Name{func}($Expr{e}) }
+    | nothing() -> type.showProd(e)
     end;
   forwards to mkErrorCheck(localErrors, fwrd);
+}
+
+function showErrors
+[Message] ::= l::Location  env::Decorated Env  type::Type
+{
+  return case getCustomShow(type, env) of
+  | just(_) -> []
+  | nothing() -> type.showErrors(l, env)
+  end;
 }
 
 abstract production showCharPointer
@@ -325,7 +328,7 @@ aspect production structField
 top::StructDeclarator ::= name::Name  ty::TypeModifierExpr  attrs::Attributes
 {
   top.showErrors =
-    \ Location env::Decorated Env -> top.typerep.showErrors(top.sourceLocation, env);
+    \ Location env::Decorated Env -> showErrors(top.sourceLocation, env, top.typerep);
   top.showTransforms =
     [ableC_Expr {
        $stringLiteralExpr{"." ++ name.name ++ " = "} +
