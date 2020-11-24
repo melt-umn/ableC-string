@@ -143,13 +143,13 @@ top::Expr ::= e::Expr
         
         // Hacky way of testing if a pointer can be dereferenced validly
         // TODO: This isn't remotely thread safe, but I don't know of a better way
-        _set_segv_handler();
+        _set_handler();
         if (!setjmp(_jump)) {
           _ptr_val = *_ptr;
         } else {
           _illegal = 1;
         }
-        _clear_segv_handler();
+        _clear_handler();
         
         !_illegal?
           "&" + $Expr{
@@ -405,8 +405,8 @@ top::Expr ::= e1::Expr e2::Expr
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
-    e1.typerep.strErrors(e1.location, e1.env) ++
-    e2.typerep.strErrors(e2.location, e2.env) ++
+    e1.typerep.defaultFunctionArrayLvalueConversion.strErrors(e1.location, e1.env) ++
+    e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.location, e2.env) ++
     checkStringHeaderDef("concat_string", top.location, top.env);
   
   e2.env = addEnv(e1.defs, e1.env);
@@ -430,8 +430,8 @@ top::Expr ::= e1::Expr e2::Expr
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
-    e1.typerep.strErrors(e1.location, e1.env) ++
-    e2.typerep.strErrors(e2.location, e2.env) ++
+    e1.typerep.defaultFunctionArrayLvalueConversion.strErrors(e1.location, e1.env) ++
+    e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.location, e2.env) ++
     checkStringHeaderDef("remove_string", top.location, top.env);
   
   e2.env = addEnv(e1.defs, e1.env);
@@ -482,8 +482,8 @@ top::Expr ::= e1::Expr e2::Expr
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
-    e1.typerep.strErrors(e1.location, e1.env) ++
-    e2.typerep.strErrors(e2.location, e2.env) ++
+    e1.typerep.defaultFunctionArrayLvalueConversion.strErrors(e1.location, e1.env) ++
+    e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.location, e2.env) ++
     checkStringHeaderDef("equals_string", top.location, top.env);
   
   e2.env = addEnv(e1.defs, e1.env);

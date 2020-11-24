@@ -19,7 +19,7 @@ struct __attribute__((refId("edu:umn:cs:melt:exts:ableC:string:string"))) _strin
 static inline void _check_index_string(string s, size_t i) {
   if (i < 0 || i >= s.length) {
     fprintf(stderr, "String index out of bounds: length %lu, index %lu\n", s.length, i);
-    exit(1);
+    abort();
   }
 }
 
@@ -68,7 +68,7 @@ static inline string remove_string(string s1, string s2) {
 static inline string substring(string s, size_t start, size_t end) {
   if (start < 0 || start >= s.length || end < 0 || end >= s.length || start > end) {
     fprintf(stderr, "Substring index out of bounds: length %lu, start %lu, end %lu\n", s.length, start, end);
-    exit(1);
+    abort();
   }
   char *result = GC_malloc(end - start + 1);
   strncpy(result, s.text + start, end - start);
@@ -212,14 +212,33 @@ static inline string show_char(char c) {
 // Hacky way of testing if a pointer can be dereferenced validly
 // TODO: This isn't remotely thread safe, but I don't know of a better way
 static jmp_buf _jump;
-static void _handle_segv(int sig) {
+static void _handle_sig(int sig) {
   longjmp(_jump, 1);
 }
-static inline void _set_segv_handler() {
-  signal(SIGSEGV, _handle_segv);
+
+struct sigaction _old_segv, _old_bus;
+static inline void _set_handler() {
+  struct sigaction sa;
+  sa.sa_handler = _handle_sig;
+  sigemptyset(&sa.sa_mask);
+  if (sigaction(SIGSEGV, &sa, &_old_segv)) {
+    perror("Couldn't set dereference SIGSEGV handler");
+    abort();
+  }
+  if (sigaction(SIGBUS, &sa, &_old_bus)) {
+    perror("Couldn't set dereference SIGBUS handler");
+    abort();
+  }
 }
-static inline void _clear_segv_handler() {
-  signal(SIGSEGV, SIG_DFL);
+static inline void _clear_handler() {
+  if (sigaction(SIGSEGV, &_old_segv, NULL)) {
+    perror("Couldn't reset dereference SIGSEGV handler");
+    abort();
+  }
+  if (sigaction(SIGBUS, &_old_bus, NULL)) {
+    perror("Couldn't reset dereference SIGBUS handler");
+    abort();
+  }
 }
 
 #endif
