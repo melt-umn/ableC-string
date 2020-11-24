@@ -216,7 +216,7 @@ static void _handle_sig(int sig) {
   longjmp(_jump, 1);
 }
 
-struct sigaction _old_segv, _old_bus;
+static struct sigaction _old_segv, _old_bus;
 static inline void _set_handler() {
   struct sigaction sa;
   sa.sa_handler = _handle_sig;
