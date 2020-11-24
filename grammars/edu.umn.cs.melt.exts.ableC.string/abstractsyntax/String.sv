@@ -143,13 +143,13 @@ top::Expr ::= e::Expr
         
         // Hacky way of testing if a pointer can be dereferenced validly
         // TODO: This isn't remotely thread safe, but I don't know of a better way
-        _set_segv_handler();
+        _set_handler();
         if (!setjmp(_jump)) {
           _ptr_val = *_ptr;
         } else {
           _illegal = 1;
         }
-        _clear_segv_handler();
+        _clear_handler();
         
         !_illegal?
           "&" + $Expr{
