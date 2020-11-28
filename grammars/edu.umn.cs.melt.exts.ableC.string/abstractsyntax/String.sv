@@ -37,7 +37,7 @@ top::Expr ::= handler::(Expr ::= Expr Location) f::Name a::Exprs
     else [];
   local fwrd::Expr =
     case a of
-    | consExpr(e, _) -> handler(decExpr(e, location=e.location), top.location)
+    | consExpr(e, _) -> handler(e, top.location)
     end;
   forwards to mkErrorCheck(localErrors, fwrd);
 }
@@ -52,7 +52,7 @@ top::Expr ::= e::Expr
   local fwrd::Expr =
     case getCustomShow(type, top.env) of
     | just(func) -> ableC_Expr{ $Name{func}($Expr{decExpr(e, location=top.location)}) }
-    | nothing() -> type.showProd(decExpr(e, location=top.location))
+    | nothing() -> type.showProd(e) -- Unavoidable re-decoration here, since we don't know what env showProd will provide to e
     end;
   forwards to mkErrorCheck(localErrors, fwrd);
 }
@@ -370,7 +370,7 @@ top::Expr ::= e::Expr
   
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
   local localErrors::[Message] = e.errors ++ type.strErrors(e.location, e.env);
-  local fwrd::Expr = type.strProd(decExpr(e, location=builtin));
+  local fwrd::Expr = type.strProd(e); -- Unavoidable re-decoration here, since we don't know what env strProd will provide to e
   forwards to mkErrorCheck(localErrors, fwrd);
 }
 
