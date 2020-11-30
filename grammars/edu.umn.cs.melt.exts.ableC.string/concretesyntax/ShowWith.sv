@@ -6,7 +6,7 @@ import silver:langutil;
 marking terminal Show_t 'show' lexer classes {Keyword, Global};
 terminal With_t 'with' lexer classes {Keyword};
 
-concrete productions top::Declaration_c
+concrete productions top::ExternalDeclaration_c
 | 'show' '(' ty::TypeName_c ')' 'with' show::Identifier_t
     { top.ast = showWithDecl(ty.ast, fromId(show)); }
 | 'show' id::TypeName_t 'with' show::Identifier_t
