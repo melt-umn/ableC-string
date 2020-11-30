@@ -30,16 +30,11 @@ abstract production singleArgExtCallExpr
 top::Expr ::= handler::(Expr ::= Expr Location) f::Name a::Exprs
 {
   top.pp = pp"${f.pp}(${ppImplode(pp", ", a.pps)})";
-  local localErrors::[Message] =
-    a.errors ++
-    if a.count != 1
-    then [err(top.location, s"${f.name} expected only 1 argument, got ${toString(a.count)}")]
-    else [];
-  local fwrd::Expr =
+  forwards to
     case a of
-    | consExpr(e, _) -> handler(e, top.location)
+    | consExpr(e, nilExpr()) -> handler(e, top.location)
+    | _ -> errorExpr([err(top.location, s"${f.name} expected exactly 1 argument, got ${toString(a.count)}")], location=top.location)
     end;
-  forwards to mkErrorCheck(localErrors, fwrd);
 }
 
 abstract production showExpr
