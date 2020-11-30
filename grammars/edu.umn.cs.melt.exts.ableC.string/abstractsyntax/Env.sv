@@ -1,7 +1,7 @@
 grammar edu:umn:cs:melt:exts:ableC:string:abstractsyntax;
 
 -- Track any custom show implementation's names.
-synthesized attribute customShows::Scopes<Name> occurs on Env;
+synthesized attribute customShows::Scopes<(Expr ::= Expr)> occurs on Env;
 
 aspect production emptyEnv_i
 top::Env ::=
@@ -34,7 +34,7 @@ top::Env ::= e::Decorated Env
   top.customShows = functionScope(e.customShows);
 }
 
-synthesized attribute customShowContribs::Contribs<Name> occurs on Defs, Def;
+synthesized attribute customShowContribs::Contribs<(Expr ::= Expr)> occurs on Defs, Def;
 
 aspect production nilDefs
 top::Defs ::=
@@ -54,13 +54,13 @@ top::Def ::=
 }
 
 abstract production customShowDef
-top::Def ::= typeName::String  showFunctionName::Name
+top::Def ::= type::Type  showProd::(Expr ::= Expr)
 {
-  top.customShowContribs = [pair(typeName, showFunctionName)];
+  top.customShowContribs = [pair(type.mangledName, showProd)];
 }
 
 function getCustomShow
-Maybe<Name> ::= t::Type  e::Decorated Env
+Maybe<(Expr ::= Expr)> ::= t::Type  e::Decorated Env
 {
   return case lookupScope(t.mangledName, e.customShows) of
   | [] -> nothing()

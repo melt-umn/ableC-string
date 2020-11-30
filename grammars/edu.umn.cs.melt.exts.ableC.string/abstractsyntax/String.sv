@@ -46,8 +46,13 @@ top::Expr ::= e::Expr
   local localErrors::[Message] = e.errors ++ showErrors(e.location, e.env, type);
   local fwrd::Expr =
     case getCustomShow(type, top.env) of
-    | just(func) -> ableC_Expr{ $Name{func}($Expr{decExpr(e, location=top.location)}) }
-    | nothing() -> type.showProd(e) -- Unavoidable re-decoration here, since we don't know what env showProd will provide to e
+    -- Unavoidable re-decoration here, since we don't know what env showProd will provide to e
+    | just(showProd) -> showProd(e)
+    | nothing() ->
+      injectGlobalDeclsExpr(
+        foldDecl([defsDecl([customShowDef(type, type.showProd)])]),
+        type.showProd(e),
+        location=builtin)
     end;
   forwards to mkErrorCheck(localErrors, fwrd);
 }
@@ -341,7 +346,7 @@ aspect production structBitfield
 top::StructDeclarator ::= name::MaybeName  ty::TypeModifierExpr  e::Expr  attrs::Attributes
 {
   top.showErrors =
-    \ Location env::Decorated Env -> top.typerep.showErrors(top.sourceLocation, env);
+    \ Location env::Decorated Env -> showErrors(top.sourceLocation, env, top.typerep);
   top.showTransforms =
     case name of
     | justName(n) ->
