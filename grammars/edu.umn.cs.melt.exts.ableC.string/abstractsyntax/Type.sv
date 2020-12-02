@@ -84,6 +84,12 @@ top::Type ::= quals::Qualifiers sub::Type
     case sub of
     | builtinType(_, signedType(charType())) -> showCharPointer(_, location=builtin)
     | builtinType(_, unsignedType(charType())) -> showCharPointer(_, location=builtin)
+    | builtinType(_, voidType()) ->
+      \ e::Expr ->
+        directCallExpr(
+          name("str_pointer", location=builtin),
+          consExpr(e, nilExpr()),
+          location=builtin)
     | _ -> showPointer(_, location=builtin)
     end;
   top.strProd =

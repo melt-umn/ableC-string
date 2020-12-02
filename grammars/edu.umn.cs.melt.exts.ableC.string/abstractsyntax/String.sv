@@ -158,7 +158,7 @@ top::Expr ::= e::Expr
               location=top.location)} :
           ({char *_baseTypeName = $stringLiteralExpr{showType(e.typerep)};
             char *_text = GC_malloc(strlen(_baseTypeName) + 17);
-            sprintf(_text, "<%s at 0x%lx>", _baseTypeName, (unsigned long)_ptr);
+            sprintf(_text, "<%s at %p>", _baseTypeName, _ptr);
             ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){strlen(_text), _text};});})
     };
 }

@@ -91,7 +91,7 @@ static inline string str_char(char c) {
 
 static inline string str_pointer(void *ptr) {
   char *result = GC_malloc(9);
-  sprintf(result, "%lx", (unsigned long)ptr);
+  sprintf(result, "%p", ptr);
   return (string)(struct _string_s){strlen(result), result};
 }
 
@@ -143,8 +143,62 @@ static inline string show_string(string s) {
   return (string)(struct _string_s){resultIndex, result};
 }
 
+// Hacky way of testing if a pointer can be dereferenced validly
+// TODO: This isn't remotely thread safe, but I don't know of a better way
+static jmp_buf _jump;
+static void _handle_sig(int sig) {
+  longjmp(_jump, 1);
+}
+
+static struct sigaction _old_segv, _old_bus;
+static inline void _set_handler() {
+  struct sigaction sa;
+  sa.sa_handler = _handle_sig;
+  sigemptyset(&sa.sa_mask);
+  if (sigaction(SIGSEGV, &sa, &_old_segv)) {
+    perror("Couldn't set dereference SIGSEGV handler");
+    abort();
+  }
+  if (sigaction(SIGBUS, &sa, &_old_bus)) {
+    perror("Couldn't set dereference SIGBUS handler");
+    abort();
+  }
+}
+static inline void _clear_handler() {
+  if (sigaction(SIGSEGV, &_old_segv, NULL)) {
+    perror("Couldn't reset dereference SIGSEGV handler");
+    abort();
+  }
+  if (sigaction(SIGBUS, &_old_bus, NULL)) {
+    perror("Couldn't reset dereference SIGBUS handler");
+    abort();
+  }
+}
+
 static inline string show_char_pointer(char *s) {
-  return show_string(str_char_pointer(s));
+  _Bool illegal = 0;
+        
+  // Hacky way of testing if a pointer can be dereferenced validly
+  // TODO: This isn't remotely thread safe, but I don't know of a better way
+  if (s) {
+    _set_handler();
+    if (!setjmp(_jump)) {
+      volatile char val = *s;
+    } else {
+      illegal = 1;
+    }
+    _clear_handler();
+  } else {
+    illegal = 1;
+  }
+  
+  if (illegal) {
+    char *result = GC_malloc(35);
+    sprintf(result, "<char * at %p>", s);
+    return (string)(struct _string_s){strlen(result), result};
+  } else {
+    return show_string(str_char_pointer(s));
+  }
 }
 
 static inline string show_bool(_Bool b) {
@@ -207,38 +261,6 @@ static inline string show_char(char c) {
   result[resultIndex] = '\0';
 
   return (string)(struct _string_s){resultIndex, result};
-}
-
-// Hacky way of testing if a pointer can be dereferenced validly
-// TODO: This isn't remotely thread safe, but I don't know of a better way
-static jmp_buf _jump;
-static void _handle_sig(int sig) {
-  longjmp(_jump, 1);
-}
-
-static struct sigaction _old_segv, _old_bus;
-static inline void _set_handler() {
-  struct sigaction sa;
-  sa.sa_handler = _handle_sig;
-  sigemptyset(&sa.sa_mask);
-  if (sigaction(SIGSEGV, &sa, &_old_segv)) {
-    perror("Couldn't set dereference SIGSEGV handler");
-    abort();
-  }
-  if (sigaction(SIGBUS, &sa, &_old_bus)) {
-    perror("Couldn't set dereference SIGBUS handler");
-    abort();
-  }
-}
-static inline void _clear_handler() {
-  if (sigaction(SIGSEGV, &_old_segv, NULL)) {
-    perror("Couldn't reset dereference SIGSEGV handler");
-    abort();
-  }
-  if (sigaction(SIGBUS, &_old_bus, NULL)) {
-    perror("Couldn't reset dereference SIGBUS handler");
-    abort();
-  }
 }
 
 #endif
