@@ -91,7 +91,7 @@ static inline string str_char(char c) {
 
 static inline string str_pointer(void *ptr) {
   char *result = GC_malloc(9);
-  sprintf(result, "%p", ptr);
+  sprintf(result, "%lx", (unsigned long)ptr);
   return (string)(struct _string_s){strlen(result), result};
 }
 
@@ -194,7 +194,7 @@ static inline string show_char_pointer(char *s) {
   
   if (illegal) {
     char *result = GC_malloc(35);
-    sprintf(result, "<char * at %p>", s);
+    sprintf(result, "<char * at 0x%lx>", (unsigned long)s);
     return (string)(struct _string_s){strlen(result), result};
   } else {
     return show_string(str_char_pointer(s));

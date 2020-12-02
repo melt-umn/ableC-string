@@ -158,8 +158,27 @@ top::Expr ::= e::Expr
               location=top.location)} :
           ({char *_baseTypeName = $stringLiteralExpr{showType(e.typerep)};
             char *_text = GC_malloc(strlen(_baseTypeName) + 17);
-            sprintf(_text, "<%s at %p>", _baseTypeName, _ptr);
+            sprintf(_text, "<%s at 0x%lx>", _baseTypeName, (unsigned long)_ptr);
             ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){strlen(_text), _text};});})
+    };
+}
+
+abstract production showOpaquePointer
+top::Expr ::= e::Expr
+{
+  top.pp = pp"show(${e.pp})";
+  
+  local subType::Type =
+    case e.typerep of
+    | pointerType(_, t) -> t
+    | _ -> errorType()
+    end;
+  forwards to
+    ableC_Expr {
+      ({char *_baseTypeName = $stringLiteralExpr{showType(e.typerep)};
+        char *_text = GC_malloc(strlen(_baseTypeName) + 17);
+        sprintf(_text, "<%s at 0x%lx>", _baseTypeName, (unsigned long)$Expr{e});
+        ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){strlen(_text), _text};})
     };
 }
 

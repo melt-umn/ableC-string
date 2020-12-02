@@ -79,6 +79,7 @@ top::Type ::= quals::Qualifiers sub::Type
       checkStringHeaderDef("show_char_pointer", l, env) ++
       case sub of
       | builtinType(_, voidType()) -> []
+      | functionType(_, _, _) -> []
       | _ -> showErrors(l, env, sub)
       end;
   top.strErrors =
@@ -88,12 +89,8 @@ top::Type ::= quals::Qualifiers sub::Type
     case sub of
     | builtinType(_, signedType(charType())) -> showCharPointer(_, location=builtin)
     | builtinType(_, unsignedType(charType())) -> showCharPointer(_, location=builtin)
-    | builtinType(_, voidType()) ->
-      \ e::Expr ->
-        directCallExpr(
-          name("str_pointer", location=builtin),
-          consExpr(e, nilExpr()),
-          location=builtin)
+    | builtinType(_, voidType()) -> showOpaquePointer(_, location=builtin)
+    | functionType(_, _, _) -> showOpaquePointer(_, location=builtin)
     | _ -> showPointer(_, location=builtin)
     end;
   top.strProd =
