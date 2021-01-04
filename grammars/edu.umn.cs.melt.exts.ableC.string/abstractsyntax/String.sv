@@ -1,5 +1,7 @@
 grammar edu:umn:cs:melt:exts:ableC:string:abstractsyntax;
 
+imports silver:core hiding equalsString;
+
 imports silver:langutil;
 imports silver:langutil:pp;
 
