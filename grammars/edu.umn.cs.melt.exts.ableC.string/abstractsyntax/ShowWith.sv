@@ -19,6 +19,6 @@ top::Decl ::= ty::TypeName  func::Name
     else [];
   forwards to
     if null(localErrors)
-      then defsDecl([customShowDef(type.mangledName, func)])
+      then defsDecl([customShowDef(type, func)])
       else warnDecl(localErrors);
 }

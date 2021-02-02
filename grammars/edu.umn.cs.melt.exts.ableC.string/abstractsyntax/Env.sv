@@ -54,15 +54,15 @@ top::Def ::=
 }
 
 abstract production customShowDef
-top::Def ::= typeName::String  showFunctionName::Name
+top::Def ::= t::Type  showFunctionName::Name
 {
-  top.customShowContribs = [pair(typeName, showFunctionName)];
+  top.customShowContribs = [pair(t.withoutTypeQualifiers.mangledName, showFunctionName)];
 }
 
 function getCustomShow
 Maybe<Name> ::= t::Type  e::Decorated Env
 {
-  return case lookupScope(t.mangledName, e.customShows) of
+  return case lookupScope(t.withoutTypeQualifiers.mangledName, e.customShows) of
   | [] -> nothing()
   | customShow :: _ -> just(customShow)
   end;
