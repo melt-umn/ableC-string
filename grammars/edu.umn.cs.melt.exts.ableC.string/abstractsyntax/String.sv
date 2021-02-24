@@ -192,6 +192,7 @@ top::Expr ::= e::Expr
   local decl::Decorated StructDecl =
     case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
     | structRefIdItem(decl) :: _ -> decl
+    | _ -> error("struct refId not found")
     end;
   
   forwards to
@@ -209,6 +210,7 @@ top::Expr ::= e::Expr
   local decl::Decorated UnionDecl =
     case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
     | unionRefIdItem(decl) :: _ -> decl
+    | _ -> error("union refId not found")
     end;
   
   forwards to

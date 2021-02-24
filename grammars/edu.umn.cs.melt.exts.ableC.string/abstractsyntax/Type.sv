@@ -294,6 +294,7 @@ top::ExtType ::= kwd::StructOrEnumOrUnion  mn::Maybe<String>  refId::String
     case kwd of
     | structSEU() -> showStruct(_, location=builtin)
     | unionSEU() -> showUnion(_, location=builtin)
+    | _ -> error("refIdExtType not a struct or union")
     end;
 }
 
