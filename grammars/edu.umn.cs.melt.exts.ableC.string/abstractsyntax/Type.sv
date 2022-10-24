@@ -20,8 +20,8 @@ top::ExtType ::=
   top.host =
     extType(
       top.givenQualifiers,
-      refIdExtType(structSEU(), "_string_s",
-      s"edu:umn:cs:melt:exts:ableC:string:string"));
+      refIdExtType(structSEU(), just("_string_s"),
+        s"edu:umn:cs:melt:exts:ableC:string:string"));
   top.mangledName = "string";
   top.isEqualTo =
     \ other::ExtType -> case other of stringType() -> true | _ -> false end;
@@ -41,6 +41,7 @@ top::ExtType ::=
     just(\ Expr Expr loc::Location -> errorExpr([err(loc, "strings are immutable, cannot assign to index")], location=loc));
   top.callMemberProd = just(callMemberString(_, _, _, _, location=_));
   top.memberProd = just(memberString(_, _, _, location=_));
+  top.exprInitProd = just(initString(_, location=_));
 }
 
 synthesized attribute showErrors::([Message] ::= Location Decorated Env) occurs on Type, BuiltinType, ExtType;
@@ -75,7 +76,12 @@ top::Type ::= quals::Qualifiers sub::Type
 {
   top.showErrors =
     \ l::Location env::Decorated Env ->
-      checkStringHeaderDef("show_char_pointer", l, env) ++ sub.showErrors(l, env);
+      checkStringHeaderDef("show_char_pointer", l, env) ++
+      case sub of
+      | builtinType(_, voidType()) -> []
+      | functionType(_, _, _) -> []
+      | _ -> showErrors(l, env, sub)
+      end;
   top.strErrors =
     \ l::Location env::Decorated Env ->
       checkStringHeaderDef("str_char_pointer", l, env) ++ sub.strErrors(l, env);
@@ -83,6 +89,8 @@ top::Type ::= quals::Qualifiers sub::Type
     case sub of
     | builtinType(_, signedType(charType())) -> showCharPointer(_, location=builtin)
     | builtinType(_, unsignedType(charType())) -> showCharPointer(_, location=builtin)
+    | builtinType(_, voidType()) -> showOpaquePointer(_, location=builtin)
+    | functionType(_, _, _) -> showOpaquePointer(_, location=builtin)
     | _ -> showPointer(_, location=builtin)
     end;
   top.strProd =
@@ -269,7 +277,7 @@ top::ExtType ::=
 }
 
 aspect production refIdExtType
-top::ExtType ::= kwd::StructOrEnumOrUnion  n::String  refId::String
+top::ExtType ::= kwd::StructOrEnumOrUnion  mn::Maybe<String>  refId::String
 {
   local topType::Type = extType(top.givenQualifiers, top);
   top.showErrors =
@@ -278,14 +286,15 @@ top::ExtType ::= kwd::StructOrEnumOrUnion  n::String  refId::String
       case kwd, lookupRefId(refId, globalEnv(env)) of
       | structSEU(), structRefIdItem(decl) :: _ -> decl.showDeclErrors(l, env)
       | unionSEU(), unionRefIdItem(decl) :: _ -> decl.showDeclErrors(l, env)
-      | structSEU(), _ -> [err(l, s"struct ${n} does not have a (global) definition.")]
-      | unionSEU(), _ -> [err(l, s"union ${n} does not have a (global) definition.")]
+      | structSEU(), _ -> [err(l, s"struct ${tagName} does not have a (global) definition.")]
+      | unionSEU(), _ -> [err(l, s"union ${tagName} does not have a (global) definition.")]
       | _, _ -> error("Unexpected refIdExtType")
       end;
   top.showProd =
     case kwd of
     | structSEU() -> showStruct(_, location=builtin)
     | unionSEU() -> showUnion(_, location=builtin)
+    | _ -> error("refIdExtType not a struct or union")
     end;
 }
 

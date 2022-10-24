@@ -1,5 +1,7 @@
 grammar edu:umn:cs:melt:exts:ableC:string:abstractsyntax;
 
+imports silver:core hiding equalsString;
+
 imports silver:langutil;
 imports silver:langutil:pp;
 
@@ -30,16 +32,11 @@ abstract production singleArgExtCallExpr
 top::Expr ::= handler::(Expr ::= Expr Location) f::Name a::Exprs
 {
   top.pp = pp"${f.pp}(${ppImplode(pp", ", a.pps)})";
-  local localErrors::[Message] =
-    a.errors ++
-    if a.count != 1
-    then [err(top.location, s"${f.name} expected only 1 argument, got ${toString(a.count)}")]
-    else [];
-  local fwrd::Expr =
+  forwards to
     case a of
-    | consExpr(e, _) -> handler(decExpr(e, location=e.location), top.location)
+    | consExpr(e, nilExpr()) -> handler(e, top.location)
+    | _ -> errorExpr([err(top.location, s"${f.name} expected exactly 1 argument, got ${toString(a.count)}")], location=top.location)
     end;
-  forwards to mkErrorCheck(localErrors, fwrd);
 }
 
 abstract production showExpr
@@ -48,9 +45,22 @@ top::Expr ::= e::Expr
   top.pp = pp"show(${e.pp})";
   
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
-  local localErrors::[Message] = e.errors ++ type.showErrors(e.location, e.env);
-  local fwrd::Expr = type.showProd(decExpr(e, location=builtin));
+  local localErrors::[Message] = e.errors ++ showErrors(e.location, e.env, type);
+  local fwrd::Expr =
+    case getCustomShow(type, top.env) of
+    | just(func) -> ableC_Expr{ $Name{func}($Expr{decExpr(e, location=top.location)}) }
+    | nothing() -> type.showProd(e) -- Unavoidable re-decoration here, since we don't know what env showProd will provide to e
+    end;
   forwards to mkErrorCheck(localErrors, fwrd);
+}
+
+function showErrors
+[Message] ::= l::Location  env::Decorated Env  type::Type
+{
+  return case getCustomShow(type, env) of
+  | just(_) -> []
+  | nothing() -> type.showErrors(l, env)
+  end;
 }
 
 abstract production showCharPointer
@@ -130,13 +140,17 @@ top::Expr ::= e::Expr
         
         // Hacky way of testing if a pointer can be dereferenced validly
         // TODO: This isn't remotely thread safe, but I don't know of a better way
-        _set_segv_handler();
-        if (!setjmp(_jump)) {
-          _ptr_val = *_ptr;
+        if(_ptr) {
+          _set_handler();
+          if (!setjmp(_jump)) {
+            _ptr_val = *_ptr;
+          } else {
+            _illegal = 1;
+          }
+          _clear_handler();
         } else {
           _illegal = 1;
         }
-        _clear_segv_handler();
         
         !_illegal?
           "&" + $Expr{
@@ -147,7 +161,26 @@ top::Expr ::= e::Expr
           ({char *_baseTypeName = $stringLiteralExpr{showType(e.typerep)};
             char *_text = GC_malloc(strlen(_baseTypeName) + 17);
             sprintf(_text, "<%s at 0x%lx>", _baseTypeName, (unsigned long)_ptr);
-            ($directTypeExpr{extType(nilQualifier(), stringType())}){strlen(_text), _text};});})
+            ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){strlen(_text), _text};});})
+    };
+}
+
+abstract production showOpaquePointer
+top::Expr ::= e::Expr
+{
+  top.pp = pp"show(${e.pp})";
+  
+  local subType::Type =
+    case e.typerep of
+    | pointerType(_, t) -> t
+    | _ -> errorType()
+    end;
+  forwards to
+    ableC_Expr {
+      ({char *_baseTypeName = $stringLiteralExpr{showType(e.typerep)};
+        char *_text = GC_malloc(strlen(_baseTypeName) + 17);
+        sprintf(_text, "<%s at 0x%lx>", _baseTypeName, (unsigned long)$Expr{e});
+        ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){strlen(_text), _text};})
     };
 }
 
@@ -159,6 +192,7 @@ top::Expr ::= e::Expr
   local decl::Decorated StructDecl =
     case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
     | structRefIdItem(decl) :: _ -> decl
+    | _ -> error("struct refId not found")
     end;
   
   forwards to
@@ -176,6 +210,7 @@ top::Expr ::= e::Expr
   local decl::Decorated UnionDecl =
     case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
     | unionRefIdItem(decl) :: _ -> decl
+    | _ -> error("union refId not found")
     end;
   
   forwards to
@@ -315,7 +350,7 @@ aspect production structField
 top::StructDeclarator ::= name::Name  ty::TypeModifierExpr  attrs::Attributes
 {
   top.showErrors =
-    \ Location env::Decorated Env -> top.typerep.showErrors(top.sourceLocation, env);
+    \ Location env::Decorated Env -> showErrors(top.sourceLocation, env, top.typerep);
   top.showTransforms =
     [ableC_Expr {
        $stringLiteralExpr{"." ++ name.name ++ " = "} +
@@ -357,7 +392,7 @@ top::Expr ::= e::Expr
   
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
   local localErrors::[Message] = e.errors ++ type.strErrors(e.location, e.env);
-  local fwrd::Expr = type.strProd(decExpr(e, location=builtin));
+  local fwrd::Expr = type.strProd(e); -- Unavoidable re-decoration here, since we don't know what env strProd will provide to e
   forwards to mkErrorCheck(localErrors, fwrd);
 }
 
@@ -392,8 +427,8 @@ top::Expr ::= e1::Expr e2::Expr
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
-    e1.typerep.strErrors(e1.location, e1.env) ++
-    e2.typerep.strErrors(e2.location, e2.env) ++
+    e1.typerep.defaultFunctionArrayLvalueConversion.strErrors(e1.location, e1.env) ++
+    e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.location, e2.env) ++
     checkStringHeaderDef("concat_string", top.location, top.env);
   
   e2.env = addEnv(e1.defs, e1.env);
@@ -417,8 +452,8 @@ top::Expr ::= e1::Expr e2::Expr
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
-    e1.typerep.strErrors(e1.location, e1.env) ++
-    e2.typerep.strErrors(e2.location, e2.env) ++
+    e1.typerep.defaultFunctionArrayLvalueConversion.strErrors(e1.location, e1.env) ++
+    e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.location, e2.env) ++
     checkStringHeaderDef("remove_string", top.location, top.env);
   
   e2.env = addEnv(e1.defs, e1.env);
@@ -469,8 +504,8 @@ top::Expr ::= e1::Expr e2::Expr
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
-    e1.typerep.strErrors(e1.location, e1.env) ++
-    e2.typerep.strErrors(e2.location, e2.env) ++
+    e1.typerep.defaultFunctionArrayLvalueConversion.strErrors(e1.location, e1.env) ++
+    e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.location, e2.env) ++
     checkStringHeaderDef("equals_string", top.location, top.env);
   
   e2.env = addEnv(e1.defs, e1.env);
@@ -568,6 +603,12 @@ top::Expr ::= e1::Expr a::Exprs
       consExpr(decExpr(e1, location=builtin), a),
       location=builtin);
   forwards to mkErrorCheck(localErrors, fwrd);
+}
+
+abstract production initString
+top::Initializer ::= e::Expr
+{
+  forwards to exprInitializer(strExpr(e, location=top.location), location=top.location);
 }
 
 -- Check the given env for the given function name
