@@ -4,6 +4,8 @@ abstract production showWithDecl
 top::Decl ::= ty::TypeName  func::Name
 {
   top.pp = pp"show ${ty.pp} with ${func.pp};";
+  propagate env, controlStmtContext;
+
   local type::Type = ty.typerep.defaultFunctionArrayLvalueConversion;
   local fnType::Type = func.valueItem.typerep;
   local expectedFnType::Type =
