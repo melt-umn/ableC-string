@@ -3,13 +3,13 @@ grammar edu:umn:cs:melt:exts:ableC:string:abstractsyntax;
 import edu:umn:cs:melt:ableC:abstractsyntax:overloadable;
 
 abstract production stringTypeExpr
-top::BaseTypeExpr ::= q::Qualifiers loc::Location
+top::BaseTypeExpr ::= q::Qualifiers
 {
   top.pp = pp"string";
   forwards to
     if !null(lookupRefId("edu:umn:cs:melt:exts:ableC:string:string", top.env))
     then extTypeExpr(q, stringType())
-    else errorTypeExpr([err(loc, "Missing include of string.xh")]);
+    else errorTypeExpr([errFromOrigin(top, "Missing include of string.xh")]);
 }
 
 abstract production stringType
@@ -26,26 +26,26 @@ top::ExtType ::=
   top.isEqualTo =
     \ other::ExtType -> case other of stringType() -> true | _ -> false end;
   
-  top.lEqProd = just(assignString(_, _, location=_));
-  top.lAddProd = just(concatString(_, _, location=_));
-  top.rAddProd = just(concatString(_, _, location=_));
-  top.lSubProd = just(removeString(_, _, location=_));
-  top.lMulProd = just(repeatString(_, _, location=_));
+  top.lEqProd = just(assignString);
+  top.lAddProd = just(concatString);
+  top.rAddProd = just(concatString);
+  top.lSubProd = just(removeString);
+  top.lMulProd = just(repeatString);
   -- Overloads for +=, -=, *=, automatically inferred from above
-  top.lEqualsProd = just(equalsString(_, _, location=_));
-  top.rEqualsProd = just(equalsString(_, _, location=_));
+  top.lEqualsProd = just(equalsString);
+  top.rEqualsProd = just(equalsString);
   -- Overload for != automatically inferred from above
-  top.arraySubscriptProd = just(subscriptString(_, _, location=_));
+  top.arraySubscriptProd = just(subscriptString);
   -- Better error message than default one about not being an lvalue
   top.addressOfArraySubscriptProd =
-    just(\ Expr Expr loc::Location -> errorExpr([err(loc, "strings are immutable, cannot assign to index")], location=loc));
-  top.callMemberProd = just(callMemberString(_, _, _, _, location=_));
-  top.memberProd = just(memberString(_, _, _, location=_));
-  top.exprInitProd = just(initString(_, location=_));
+    just(\ Expr Expr -> errorExpr([errFromOrigin(ambientOrigin(), "strings are immutable, cannot assign to index")]));
+  top.callMemberProd = just(callMemberString);
+  top.memberProd = just(memberString);
+  top.exprInitProd = just(initString);
 }
 
-synthesized attribute showErrors::([Message] ::= Location Decorated Env) occurs on Type, BuiltinType, ExtType;
-synthesized attribute strErrors::([Message] ::= Location Decorated Env) occurs on Type, BuiltinType, ExtType;
+synthesized attribute showErrors::([Message] ::= Decorated Expr with {env}) occurs on Type, BuiltinType, ExtType;
+synthesized attribute strErrors::([Message] ::= Decorated Expr with {env}) occurs on Type, BuiltinType, ExtType;
 synthesized attribute showProd::(Expr ::= Expr) occurs on Type, BuiltinType, ExtType;
 synthesized attribute strProd::(Expr ::= Expr) occurs on Type, BuiltinType, ExtType;
 
@@ -53,11 +53,11 @@ aspect default production
 top::Type ::=
 {
   top.showErrors =
-    \ l::Location Decorated Env ->
-      [err(l, s"show is not defined for type ${showType(top)}")];
+    \ e::Decorated Expr with {env} ->
+      [errFromOrigin(e, s"show is not defined for type ${showType(top)}")];
   top.strErrors =
-    \ l::Location Decorated Env ->
-      [err(l, s"str is not defined for type ${showType(top)}")];
+    \ e::Decorated Expr with {env} ->
+      [errFromOrigin(e, s"str is not defined for type ${showType(top)}")];
   top.showProd = error("Undefined");
   top.strProd = error("Undefined");
 }
@@ -65,44 +65,43 @@ top::Type ::=
 aspect production errorType
 top::Type ::= 
 {
-  top.showErrors = \ l::Location Decorated Env -> [];
-  top.strErrors = \ l::Location Decorated Env -> [];
-  top.showProd = \ e::Expr -> errorExpr([], location=builtin);
-  top.strProd = \ e::Expr -> errorExpr([], location=builtin);
+  top.showErrors = \ e::Decorated Expr with {env} -> [];
+  top.strErrors = \ e::Decorated Expr with {env} -> [];
+  top.showProd = \ e::Expr -> errorExpr([]);
+  top.strProd = \ e::Expr -> errorExpr([]);
 }
 
 aspect production pointerType
 top::Type ::= quals::Qualifiers sub::Type
 {
   top.showErrors =
-    \ l::Location env::Decorated Env ->
-      checkStringHeaderDef("show_char_pointer", l, env) ++
+    \ e::Decorated Expr with {env} ->
+      checkStringHeaderDef("show_char_pointer", e.env) ++
       case sub of
       | builtinType(_, voidType()) -> []
       | functionType(_, _, _) -> []
-      | _ -> showErrors(l, env, sub)
+      | _ -> showErrors(e, sub)
       end;
   top.strErrors =
-    \ l::Location env::Decorated Env ->
-      checkStringHeaderDef("str_char_pointer", l, env) ++ sub.strErrors(l, env);
+    \ e::Decorated Expr with {env} ->
+      checkStringHeaderDef("str_char_pointer", e.env) ++ sub.strErrors(e);
   top.showProd =
     case sub of
-    | builtinType(_, signedType(charType())) -> showCharPointer(_, location=builtin)
-    | builtinType(_, unsignedType(charType())) -> showCharPointer(_, location=builtin)
-    | builtinType(_, voidType()) -> showOpaquePointer(_, location=builtin)
-    | functionType(_, _, _) -> showOpaquePointer(_, location=builtin)
-    | _ -> showPointer(_, location=builtin)
+    | builtinType(_, signedType(charType())) -> showCharPointer
+    | builtinType(_, unsignedType(charType())) -> showCharPointer
+    | builtinType(_, voidType()) -> showOpaquePointer
+    | functionType(_, _, _) -> showOpaquePointer
+    | _ -> showPointer
     end;
   top.strProd =
     case sub of
-    | builtinType(_, signedType(charType())) -> strCharPointer(_, location=builtin)
-    | builtinType(_, unsignedType(charType())) -> strCharPointer(_, location=builtin)
+    | builtinType(_, signedType(charType())) -> strCharPointer
+    | builtinType(_, unsignedType(charType())) -> strCharPointer
     | _ ->
       \ e::Expr ->
         directCallExpr(
-          name("str_pointer", location=builtin),
-          consExpr(e, nilExpr()),
-          location=builtin)
+          name("str_pointer"),
+          consExpr(e, nilExpr()))
     end;
 }
 
@@ -119,11 +118,11 @@ aspect default production
 top::BuiltinType ::=
 {
   top.showErrors =
-    \ l::Location Decorated Env ->
-      [err(l, s"show is not defined for type ${showType(builtinType(nilQualifier(), top))}")];
+    \ e::Decorated Expr with {env} ->
+      [errFromOrigin(e, s"show is not defined for type ${showType(builtinType(nilQualifier(), top))}")];
   top.strErrors =
-    \ l::Location Decorated Env ->
-      [err(l, s"str is not defined for type ${showType(builtinType(nilQualifier(), top))}")];
+    \ e::Decorated Expr with {env} ->
+      [errFromOrigin(e, s"str is not defined for type ${showType(builtinType(nilQualifier(), top))}")];
   top.showProd = error("Undefined");
   top.strProd = error("Undefined");
 }
@@ -131,112 +130,100 @@ top::BuiltinType ::=
 aspect production boolType
 top::BuiltinType ::=
 {
-  top.showErrors = checkStringHeaderDef("show_bool", _, _);
-  top.strErrors = checkStringHeaderDef("show_bool", _, _);
+  top.showErrors = \ e::Decorated Expr with {env} -> checkStringHeaderDef("show_bool", e.env);
+  top.strErrors = \ e::Decorated Expr with {env} -> checkStringHeaderDef("show_bool", e.env);
   top.showProd =
     \ e::Expr ->
       directCallExpr(
-        name("show_bool", location=builtin),
-        consExpr(e, nilExpr()),
-        location=builtin);
+        name("show_bool"),
+        consExpr(e, nilExpr()));
   top.strProd =
     \ e::Expr ->
       directCallExpr(
-        name("show_bool", location=builtin),
-        consExpr(e, nilExpr()),
-        location=builtin);
+        name("show_bool"),
+        consExpr(e, nilExpr()));
 }
 
 aspect production realType
 top::BuiltinType ::= sub::RealType
 {
-  top.showErrors = checkStringHeaderDef("show_float", _, _);
-  top.strErrors = checkStringHeaderDef("show_float", _, _);
+  top.showErrors = \ e::Decorated Expr with {env} -> checkStringHeaderDef("show_float", e.env);
+  top.strErrors = \ e::Decorated Expr with {env} -> checkStringHeaderDef("show_float", e.env);
   top.showProd =
     \ e::Expr ->
       directCallExpr(
-        name("show_float", location=builtin),
-        consExpr(e, nilExpr()),
-        location=builtin);
+        name("show_float"),
+        consExpr(e, nilExpr()));
   top.strProd =
     \ e::Expr ->
       directCallExpr(
-        name("show_float", location=builtin),
-        consExpr(e, nilExpr()),
-        location=builtin);
+        name("show_float"),
+        consExpr(e, nilExpr()));
 }
 
 aspect production signedType
 top::BuiltinType ::= sub::IntegerType
 {
-  top.showErrors = checkStringHeaderDef("show_int", _, _);
-  top.strErrors = checkStringHeaderDef("show_int", _, _);
+  top.showErrors = \ e::Decorated Expr with {env} -> checkStringHeaderDef("show_int", e.env);
+  top.strErrors = \ e::Decorated Expr with {env} -> checkStringHeaderDef("show_int", e.env);
   top.showProd =
     case sub of
     | charType() ->
       \ e::Expr ->
         directCallExpr(
-          name("show_char", location=builtin),
-          consExpr(e, nilExpr()),
-          location=builtin)
+          name("show_char"),
+          consExpr(e, nilExpr()))
     | _ ->
       \ e::Expr ->
         directCallExpr(
-          name("show_int", location=builtin),
-          consExpr(e, nilExpr()),
-          location=builtin)
+          name("show_int"),
+          consExpr(e, nilExpr()))
     end;
   top.strProd =
     case sub of
     | charType() ->
       \ e::Expr ->
         directCallExpr(
-          name("str_char", location=builtin),
-          consExpr(e, nilExpr()),
-          location=builtin)
+          name("str_char"),
+          consExpr(e, nilExpr()))
     | _ ->
       \ e::Expr ->
         directCallExpr(
-          name("show_int", location=builtin),
-          consExpr(e, nilExpr()),
-          location=builtin)
+          name("show_int"),
+          consExpr(e, nilExpr()))
     end;
 }
 
 aspect production unsignedType
 top::BuiltinType ::= sub::IntegerType
 {
-  top.showErrors = checkStringHeaderDef("show_int", _, _);
-  top.strErrors = checkStringHeaderDef("show_int", _, _);
+  top.showErrors = \ e::Decorated Expr with {env} -> checkStringHeaderDef("show_int", e.env);
+  top.strErrors = \ e::Decorated Expr with {env} -> checkStringHeaderDef("show_int", e.env);
   top.showProd =
     case sub of
     | charType() ->
       \ e::Expr ->
         directCallExpr(
-          name("show_char", location=builtin),
-          consExpr(e, nilExpr()),
-          location=builtin)
+          name("show_char"),
+          consExpr(e, nilExpr()))
     | _ ->
       \ e::Expr ->
         directCallExpr(
-          name("show_int", location=builtin),
-          consExpr(e, nilExpr()),
-          location=builtin)
+          name("show_int"),
+          consExpr(e, nilExpr()))
     end;
   top.strProd =
     case sub of
     | charType() ->
       \ e::Expr ->
         directCallExpr(
-          name("str_char", location=builtin),
-          consExpr(e, nilExpr()),
-          location=builtin)
+          name("str_char"),
+          consExpr(e, nilExpr()))
     | _ ->
       \ e::Expr ->
         directCallExpr(
-          name("show_int", location=builtin),
-          consExpr(e, nilExpr()),
-          location=builtin)
+          name("show_int"),
+          consExpr(e, nilExpr()))
     end;
 }
 
@@ -253,11 +240,11 @@ aspect default production
 top::ExtType ::=
 {
   top.showErrors =
-    \ l::Location Decorated Env ->
-      [err(l, s"show is not defined for type ${showType(extType(nilQualifier(), top))}")];
+    \ e::Decorated Expr with {env} ->
+      [errFromOrigin(e, s"show is not defined for type ${showType(extType(nilQualifier(), top))}")];
   top.strErrors =
-    \ l::Location Decorated Env ->
-      [err(l, s"str is not defined for type ${showType(extType(nilQualifier(), top))}")];
+    \ e::Decorated Expr with {env}->
+      [errFromOrigin(e, s"str is not defined for type ${showType(extType(nilQualifier(), top))}")];
   top.showProd = error("Undefined");
   top.strProd = error("Undefined");
 }
@@ -265,14 +252,13 @@ top::ExtType ::=
 aspect production stringType
 top::ExtType ::=
 {
-  top.showErrors = checkStringHeaderDef("show_string", _, _);
-  top.strErrors = \ Location Decorated Env -> [];
+  top.showErrors = \ e::Decorated Expr with {env} -> checkStringHeaderDef("show_string", e.env);
+  top.strErrors = \ Decorated Expr with {env} -> [];
   top.showProd =
     \ e::Expr ->
       directCallExpr(
-        name("show_string", location=builtin),
-        consExpr(e, nilExpr()),
-        location=builtin);
+        name("show_string"),
+        consExpr(e, nilExpr()));
   top.strProd = \ e::Expr -> e;
 }
 
@@ -281,19 +267,19 @@ top::ExtType ::= kwd::StructOrEnumOrUnion  mn::Maybe<String>  refId::String
 {
   local topType::Type = extType(top.givenQualifiers, top);
   top.showErrors =
-    \ l::Location env::Decorated Env ->
-      checkStringHeaderDef("concat_string", l, env) ++
-      case kwd, lookupRefId(refId, globalEnv(env)) of
-      | structSEU(), structRefIdItem(decl) :: _ -> decl.showDeclErrors(l, env)
-      | unionSEU(), unionRefIdItem(decl) :: _ -> decl.showDeclErrors(l, env)
-      | structSEU(), _ -> [err(l, s"struct ${tagName} does not have a (global) definition.")]
-      | unionSEU(), _ -> [err(l, s"union ${tagName} does not have a (global) definition.")]
+    \ e::Decorated Expr with {env} ->
+      checkStringHeaderDef("concat_string", e.env) ++
+      case kwd, lookupRefId(refId, globalEnv(e.env)) of
+      | structSEU(), structRefIdItem(decl) :: _ -> decl.showDeclErrors(e)
+      | unionSEU(), unionRefIdItem(decl) :: _ -> decl.showDeclErrors(e)
+      | structSEU(), _ -> [errFromOrigin(e, s"struct ${tagName} does not have a (global) definition.")]
+      | unionSEU(), _ -> [errFromOrigin(e, s"union ${tagName} does not have a (global) definition.")]
       | _, _ -> error("Unexpected refIdExtType")
       end;
   top.showProd =
     case kwd of
-    | structSEU() -> showStruct(_, location=builtin)
-    | unionSEU() -> showUnion(_, location=builtin)
+    | structSEU() -> showStruct
+    | unionSEU() -> showUnion
     | _ -> error("refIdExtType not a struct or union")
     end;
 }
@@ -301,8 +287,8 @@ top::ExtType ::= kwd::StructOrEnumOrUnion  mn::Maybe<String>  refId::String
 aspect production enumExtType
 top::ExtType ::= ref::Decorated EnumDecl
 {
-  top.showErrors = checkStringHeaderDef("show_char_pointer", _, _);
-  top.strErrors = checkStringHeaderDef("show_int", _, _);
+  top.showErrors = \ e::Decorated Expr with {env} -> checkStringHeaderDef("show_char_pointer", e.env);
+  top.strErrors = \ e::Decorated Expr with {env} -> checkStringHeaderDef("show_int", e.env);
   top.showProd =
     \ e::Expr ->
       ableC_Expr {

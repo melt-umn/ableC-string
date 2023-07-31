@@ -16,7 +16,7 @@ concrete productions top::ExternalDeclaration_c
     { local ty::TypeName = typeName(kwd.ast(fromTy(id)), baseTypeExpr());
       top.ast = showWithDecl(ty, fromId(show)); }
 
-closed nonterminal TagKeyword_c with ast<(BaseTypeExpr ::= Name)>;
+closed tracked nonterminal TagKeyword_c with ast<(BaseTypeExpr ::= Name)>;
 
 concrete productions top::TagKeyword_c
 | 'enum'
