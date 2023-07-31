@@ -46,7 +46,7 @@ top::Expr ::= e::Expr
   propagate env, controlStmtContext;
   
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
-  local localErrors::[Message] = e.errors ++ showErrors(e, e.typerep);
+  local localErrors::[Message] = e.errors ++ showErrors(e, type);
   local fwrd::Expr =
     case getCustomShow(type, top.env) of
     | just(func) -> ableC_Expr{ $Name{func}($Expr{decExpr(e)}) }
