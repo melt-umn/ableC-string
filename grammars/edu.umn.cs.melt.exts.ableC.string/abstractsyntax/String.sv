@@ -43,6 +43,7 @@ abstract production showExpr
 top::Expr ::= e::Expr
 {
   top.pp = pp"show(${e.pp})";
+  attachNote extensionGenerated("ableC-string");
   propagate env, controlStmtContext;
   
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
@@ -68,6 +69,7 @@ abstract production showCharPointer
 top::Expr ::= e::Expr
 {
   top.pp = pp"show(${e.pp})";
+  attachNote extensionGenerated("ableC-string");
   
   forwards to
     ableC_Expr {
@@ -92,6 +94,8 @@ top::EnumDecl ::= name::MaybeName  dcls::EnumItemList
 aspect production consEnumItem
 top::EnumItemList ::= h::EnumItem  t::EnumItemList
 {
+  attachNote extensionGenerated("ableC-string");
+
   top.showTransform =
     ableC_Expr {
       _enum_val == $name{h.name}?
@@ -109,6 +113,8 @@ top::EnumItemList ::= h::EnumItem  t::EnumItemList
 aspect production nilEnumItem
 top::EnumItemList ::=
 {
+  attachNote extensionGenerated("ableC-string");
+
   top.showTransform =
     ableC_Expr {
       "<" +
@@ -127,6 +133,7 @@ abstract production showPointer
 top::Expr ::= e::Expr
 {
   top.pp = pp"show(${e.pp})";
+  attachNote extensionGenerated("ableC-string");
   propagate env, controlStmtContext;
   
   local subType::Type =
@@ -170,6 +177,7 @@ abstract production showOpaquePointer
 top::Expr ::= e::Expr
 {
   top.pp = pp"show(${e.pp})";
+  attachNote extensionGenerated("ableC-string");
   propagate env, controlStmtContext;
   
   local subType::Type =
@@ -190,6 +198,7 @@ abstract production showStruct
 top::Expr ::= e::Expr
 {
   top.pp = pp"show(${e.pp})";
+  attachNote extensionGenerated("ableC-string");
   propagate env, controlStmtContext;
   
   local decl::Decorated StructDecl =
@@ -208,6 +217,7 @@ abstract production showUnion
 top::Expr ::= e::Expr
 {
   top.pp = pp"show(${e.pp})";
+  attachNote extensionGenerated("ableC-string");
   propagate env, controlStmtContext;
   
   local decl::Decorated UnionDecl =
@@ -238,6 +248,7 @@ global foldShowTransform::(Expr ::= [Expr]) =
 aspect production structDecl
 top::StructDecl ::= attrs::Attributes  name::MaybeName  dcls::StructItemList
 {
+  attachNote extensionGenerated("ableC-string");
   local n::String = name.maybename.fromJust.name;
   local checkExpr::Expr = errorExpr([]); -- Expr that gets decorated to pass the right origin and env
   top.showDeclErrors =
@@ -266,6 +277,7 @@ top::StructDecl ::= attrs::Attributes  name::MaybeName  dcls::StructItemList
 aspect production unionDecl
 top::UnionDecl ::= attrs::Attributes  name::MaybeName  dcls::StructItemList
 {
+  attachNote extensionGenerated("ableC-string");
   local n::String = name.maybename.fromJust.name;
   local checkExpr::Expr = errorExpr([]); -- Expr that gets decorated to pass the right origin and env
   top.showDeclErrors =
@@ -351,6 +363,7 @@ top::StructDeclarators ::=
 aspect production structField
 top::StructDeclarator ::= name::Name  ty::TypeModifierExpr  attrs::Attributes
 {
+  attachNote extensionGenerated("ableC-string");
   local checkExpr::Expr = errorExpr([]);
   top.showErrors =
     \ e::Decorated Expr with {env} -> showErrors(decorate checkExpr with {env = e.env;}, top.typerep);
@@ -365,6 +378,7 @@ top::StructDeclarator ::= name::Name  ty::TypeModifierExpr  attrs::Attributes
 aspect production structBitfield
 top::StructDeclarator ::= name::MaybeName  ty::TypeModifierExpr  e::Expr  attrs::Attributes
 {
+  attachNote extensionGenerated("ableC-string");
   local checkExpr::Expr = errorExpr([]);
   top.showErrors =
     \ e::Decorated Expr with {env} -> showErrors(decorate checkExpr with {env = e.env;}, top.typerep);
@@ -426,6 +440,7 @@ abstract production concatString
 top::Expr ::= e1::Expr e2::Expr
 {
   top.pp = pp"${e1.pp} + ${e2.pp}";
+  attachNote extensionGenerated("ableC-string");
   propagate controlStmtContext;
   
   local localErrors::[Message] =
@@ -452,6 +467,7 @@ abstract production removeString
 top::Expr ::= e1::Expr e2::Expr
 {
   top.pp = pp"${e1.pp} - ${e2.pp}";
+  attachNote extensionGenerated("ableC-string");
   propagate controlStmtContext;
   
   local localErrors::[Message] =
@@ -478,6 +494,7 @@ abstract production repeatString
 top::Expr ::= e1::Expr e2::Expr
 {
   top.pp = pp"${e1.pp} * ${e2.pp}";
+  attachNote extensionGenerated("ableC-string");
   propagate controlStmtContext;
   
   local localErrors::[Message] =
@@ -506,6 +523,7 @@ abstract production equalsString
 top::Expr ::= e1::Expr e2::Expr
 {
   top.pp = pp"${e1.pp} == ${e2.pp}";
+  attachNote extensionGenerated("ableC-string");
   propagate controlStmtContext;
   
   local localErrors::[Message] =
@@ -532,6 +550,7 @@ abstract production subscriptString
 top::Expr ::= e1::Expr e2::Expr
 {
   top.pp = pp"${e1.pp}[${e2.pp}]";
+  attachNote extensionGenerated("ableC-string");
   propagate controlStmtContext;
   
   local localErrors::[Message] =
@@ -571,6 +590,7 @@ abstract production memberString
 top::Expr ::= lhs::Expr deref::Boolean rhs::Name
 {
   top.pp = parens(ppConcat([lhs.pp, text(if deref then "->" else "."), rhs.pp]));
+  attachNote extensionGenerated("ableC-string");
   propagate env, controlStmtContext;
 
   local localErrors::[Message] =
@@ -592,6 +612,7 @@ abstract production substringString
 top::Expr ::= e1::Expr a::Exprs
 {
   top.pp = pp"${e1.pp}.substring(${ppImplode(pp", ", a.pps)}";
+  attachNote extensionGenerated("ableC-string");
   propagate controlStmtContext;
   
   e1.env = top.env;

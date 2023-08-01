@@ -4,6 +4,7 @@ abstract production showWithDecl
 top::Decl ::= ty::TypeName  func::Name
 {
   top.pp = pp"show ${ty.pp} with ${func.pp};";
+  attachNote extensionGenerated("ableC-string");
   propagate env, controlStmtContext;
 
   local type::Type = ty.typerep.defaultFunctionArrayLvalueConversion;
