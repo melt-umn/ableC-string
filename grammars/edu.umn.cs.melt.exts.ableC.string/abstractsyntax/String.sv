@@ -47,7 +47,7 @@ top::Expr ::= e::Expr
   propagate env, controlStmtContext;
   
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
-  local localErrors::[Message] = e.errors ++ showErrors(e, type);
+  local localErrors::[Message] = e.errors ++ showErrors(top.env, type);
   local fwrd::Expr =
     case getCustomShow(type, top.env) of
     | just(func) -> ableC_Expr{ $Name{func}($Expr{decExpr(e)}) }
@@ -57,11 +57,11 @@ top::Expr ::= e::Expr
 }
 
 function showErrors
-[Message] ::= e::Decorated Expr with {env}  type::Type
+[Message] ::= env::Decorated Env  type::Type
 {
-  return case getCustomShow(type, e.env) of
+  return case getCustomShow(type, env) of
   | just(_) -> []
-  | nothing() -> type.showErrors(e)
+  | nothing() -> type.showErrors(env)
   end;
 }
 
@@ -232,7 +232,7 @@ top::Expr ::= e::Expr
       ableC_Expr { $name{decl.showFnName}($Expr{e}) });
 }
 
-synthesized attribute showDeclErrors::([Message] ::= Decorated Expr with {env}) occurs on StructDecl, UnionDecl;
+synthesized attribute showDeclErrors::([Message] ::= Decorated Env) occurs on StructDecl, UnionDecl;
 synthesized attribute showFnName::String occurs on StructDecl, UnionDecl;
 synthesized attribute showFnDecls::Decls occurs on StructDecl, UnionDecl;
 attribute showErrors occurs on StructDecl, UnionDecl, StructItemList, StructItem, StructDeclarators, StructDeclarator;
@@ -250,16 +250,17 @@ top::StructDecl ::= attrs::Attributes  name::MaybeName  dcls::StructItemList
 {
   attachNote extensionGenerated("ableC-string");
   local n::String = name.maybename.fromJust.name;
-  local checkExpr::Expr = errorExpr([]); -- Expr that gets decorated to pass the right origin and env
   top.showDeclErrors =
-    \ e::Decorated Expr with {env} ->
+    \ env::Decorated Env ->
       if !name.maybename.isJust
-      then [errFromOrigin(e, "Cannot show anonymous struct")]
-      else if null(lookupValue(top.showFnName, e.env))
+      then [errFromOrigin(ambientOrigin(), "Cannot show anonymous struct")]
+      else if null(lookupValue(top.showFnName, env))
       then
-        case top.showErrors(decorate checkExpr with {env = addEnv([valueDef(top.showFnName, errorValueItem())], e.env);}) of
+        case attachNote logicalLocationFromOrigin(top) on
+            top.showErrors(addEnv([valueDef(top.showFnName, errorValueItem())], env))
+          end of
         | [] -> []
-        | m -> [nested(getParsedOriginLocationOrFallback(e), s"In showing struct ${n}", m)]
+        | m -> [nested(getParsedOriginLocationOrFallback(ambientOrigin()), s"In showing struct ${n}", m)]
         end
       else [];
   top.showFnName = s"_show_${n}";
@@ -281,14 +282,16 @@ top::UnionDecl ::= attrs::Attributes  name::MaybeName  dcls::StructItemList
   local n::String = name.maybename.fromJust.name;
   local checkExpr::Expr = errorExpr([]); -- Expr that gets decorated to pass the right origin and env
   top.showDeclErrors =
-    \ e::Decorated Expr with {env} ->
+    \ env::Decorated Env ->
       if !name.maybename.isJust
-      then [errFromOrigin(e, "Cannot show anonymous union")]
-      else if null(lookupValue(top.showFnName, e.env))
+      then [errFromOrigin(ambientOrigin(), "Cannot show anonymous union")]
+      else if null(lookupValue(top.showFnName, env))
       then
-        case top.showErrors(decorate checkExpr with {env = addEnv([valueDef(top.showFnName, errorValueItem())], e.env);}) of
+        case attachNote logicalLocationFromOrigin(top) on
+            top.showErrors(addEnv([valueDef(top.showFnName, errorValueItem())], env))
+          end of
         | [] -> []
-        | m -> [nested(getParsedOriginLocationOrFallback(e), s"In showing union ${n}", m)]
+        | m -> [nested(getParsedOriginLocationOrFallback(ambientOrigin()), s"In showing union ${n}", m)]
         end
       else [];
   top.showFnName = s"_show_${n}";
@@ -306,13 +309,13 @@ top::UnionDecl ::= attrs::Attributes  name::MaybeName  dcls::StructItemList
 aspect production consStructItem
 top::StructItemList ::= h::StructItem  t::StructItemList
 {
-  top.showErrors = \ e::Decorated Expr with {env} -> h.showErrors(e) ++ t.showErrors(e);
+  top.showErrors = \ env::Decorated Env -> h.showErrors(env) ++ t.showErrors(env);
   top.showTransforms = h.showTransforms ++ t.showTransforms;
 }
 aspect production nilStructItem
 top::StructItemList ::=
 {
-  top.showErrors = \ Decorated Expr with {env} -> [];
+  top.showErrors = \ Decorated Env -> [];
   top.showTransforms = [];
 }
 
@@ -343,20 +346,20 @@ top::StructItem ::= d::UnionDecl
 aspect production warnStructItem
 top::StructItem ::= msg::[Message]
 {
-  top.showErrors = \ Decorated Expr with {env} -> [];
+  top.showErrors = \ Decorated Env -> [];
   top.showTransforms = [];
 }
 
 aspect production consStructDeclarator
 top::StructDeclarators ::= h::StructDeclarator  t::StructDeclarators
 {
-  top.showErrors = \ e::Decorated Expr with {env} -> h.showErrors(e) ++ t.showErrors(e);
+  top.showErrors = \ env::Decorated Env -> h.showErrors(env) ++ t.showErrors(env);
   top.showTransforms = h.showTransforms ++ t.showTransforms;
 }
 aspect production nilStructDeclarator
 top::StructDeclarators ::=
 {
-  top.showErrors = \ Decorated Expr with {env} -> [];
+  top.showErrors = \ Decorated Env -> [];
   top.showTransforms = [];
 }
 
@@ -365,8 +368,8 @@ top::StructDeclarator ::= name::Name  ty::TypeModifierExpr  attrs::Attributes
 {
   attachNote extensionGenerated("ableC-string");
   local checkExpr::Expr = errorExpr([]);
-  top.showErrors =
-    \ e::Decorated Expr with {env} -> showErrors(decorate checkExpr with {env = e.env;}, top.typerep);
+  top.showErrors = \ env::Decorated Env ->
+    attachNote logicalLocationFromOrigin(top) on showErrors(env, top.typerep) end;
   top.showTransforms =
     [ableC_Expr {
        $stringLiteralExpr{"." ++ name.name ++ " = "} +
@@ -380,8 +383,8 @@ top::StructDeclarator ::= name::MaybeName  ty::TypeModifierExpr  e::Expr  attrs:
 {
   attachNote extensionGenerated("ableC-string");
   local checkExpr::Expr = errorExpr([]);
-  top.showErrors =
-    \ e::Decorated Expr with {env} -> showErrors(decorate checkExpr with {env = e.env;}, top.typerep);
+  top.showErrors = \ env::Decorated Env ->
+    attachNote logicalLocationFromOrigin(top) on showErrors(env, top.typerep) end;
   top.showTransforms =
     case name of
     | justName(n) ->
@@ -397,7 +400,7 @@ top::StructDeclarator ::= name::MaybeName  ty::TypeModifierExpr  e::Expr  attrs:
 aspect production warnStructField
 top::StructDeclarator ::= msg::[Message]
 {
-  top.showErrors = \ Decorated Expr with {env} -> [];
+  top.showErrors = \ Decorated Env -> [];
   top.showTransforms = [];
 }
 
@@ -408,7 +411,7 @@ top::Expr ::= e::Expr
   propagate env, controlStmtContext;
   
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
-  local localErrors::[Message] = e.errors ++ type.strErrors(e);
+  local localErrors::[Message] = e.errors ++ type.strErrors(e.env);
   local fwrd::Expr = type.strProd(e); -- Unavoidable re-decoration here, since we don't know what env strProd will provide to e
   forwards to mkErrorCheck(localErrors, fwrd);
 }
@@ -445,8 +448,12 @@ top::Expr ::= e1::Expr e2::Expr
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
-    e1.typerep.defaultFunctionArrayLvalueConversion.strErrors(e1) ++
-    e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2) ++
+    attachNote logicalLocationFromOrigin(e1) on
+      e1.typerep.defaultFunctionArrayLvalueConversion.strErrors(e1.env)
+    end ++
+    attachNote logicalLocationFromOrigin(e2) on
+      e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.env)
+    end ++
     checkStringHeaderDef("concat_string", top.env);
   
   e1.env = top.env;
@@ -472,8 +479,12 @@ top::Expr ::= e1::Expr e2::Expr
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
-    e1.typerep.defaultFunctionArrayLvalueConversion.strErrors(e1) ++
-    e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2) ++
+    attachNote logicalLocationFromOrigin(e1) on
+      e1.typerep.defaultFunctionArrayLvalueConversion.strErrors(e1.env)
+    end ++
+    attachNote logicalLocationFromOrigin(e2) on
+      e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.env)
+    end ++
     checkStringHeaderDef("remove_string", top.env);
   
   e1.env = top.env;
@@ -528,8 +539,12 @@ top::Expr ::= e1::Expr e2::Expr
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
-    e1.typerep.defaultFunctionArrayLvalueConversion.strErrors(e1) ++
-    e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2) ++
+    attachNote logicalLocationFromOrigin(e1) on
+      e1.typerep.defaultFunctionArrayLvalueConversion.strErrors(e1.env)
+    end ++
+    attachNote logicalLocationFromOrigin(e2) on
+      e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.env)
+    end ++
     checkStringHeaderDef("equals_string", top.env);
   
   e1.env = top.env;

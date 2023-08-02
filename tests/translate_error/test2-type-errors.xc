@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
 
   a[2] = 'a'; // Assign to string elements
   a.length = 4; // Assign to string length
-  a.text = "qwerty"; // Assign to strign text
+  a.text = "qwerty"; // Assign to string text
 
   str(1, 3.14); // Wrong number of arguments
 
