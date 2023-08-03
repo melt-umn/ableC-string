@@ -433,10 +433,7 @@ top::Expr ::= lhs::Expr rhs::Expr
 {
   top.pp = pp"${lhs.pp} = ${rhs.pp}";
   
-  forwards to
-    eqExpr(
-      lhs,
-      strExpr(rhs));
+  forwards to eqExpr(lhs, strExpr(rhs));
 }
 
 abstract production concatString
