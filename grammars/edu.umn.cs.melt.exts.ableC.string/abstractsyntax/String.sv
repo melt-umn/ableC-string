@@ -43,6 +43,7 @@ abstract production showExpr
 top::Expr ::= e::Expr
 {
   top.pp = pp"show(${e.pp})";
+  propagate env, controlStmtContext;
   
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
   local localErrors::[Message] = e.errors ++ showErrors(e.location, e.env, type);
@@ -126,6 +127,7 @@ abstract production showPointer
 top::Expr ::= e::Expr
 {
   top.pp = pp"show(${e.pp})";
+  propagate env, controlStmtContext;
   
   local subType::Type =
     case e.typerep of
@@ -169,6 +171,7 @@ abstract production showOpaquePointer
 top::Expr ::= e::Expr
 {
   top.pp = pp"show(${e.pp})";
+  propagate env, controlStmtContext;
   
   local subType::Type =
     case e.typerep of
@@ -188,6 +191,7 @@ abstract production showStruct
 top::Expr ::= e::Expr
 {
   top.pp = pp"show(${e.pp})";
+  propagate env, controlStmtContext;
   
   local decl::Decorated StructDecl =
     case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
@@ -206,6 +210,7 @@ abstract production showUnion
 top::Expr ::= e::Expr
 {
   top.pp = pp"show(${e.pp})";
+  propagate env, controlStmtContext;
   
   local decl::Decorated UnionDecl =
     case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
@@ -389,6 +394,7 @@ abstract production strExpr
 top::Expr ::= e::Expr
 {
   top.pp = pp"str(${e.pp})";
+  propagate env, controlStmtContext;
   
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
   local localErrors::[Message] = e.errors ++ type.strErrors(e.location, e.env);
@@ -424,6 +430,7 @@ abstract production concatString
 top::Expr ::= e1::Expr e2::Expr
 {
   top.pp = pp"${e1.pp} + ${e2.pp}";
+  propagate controlStmtContext;
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
@@ -431,6 +438,7 @@ top::Expr ::= e1::Expr e2::Expr
     e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.location, e2.env) ++
     checkStringHeaderDef("concat_string", top.location, top.env);
   
+  e1.env = top.env;
   e2.env = addEnv(e1.defs, e1.env);
   
   local fwrd::Expr =
@@ -449,6 +457,7 @@ abstract production removeString
 top::Expr ::= e1::Expr e2::Expr
 {
   top.pp = pp"${e1.pp} - ${e2.pp}";
+  propagate controlStmtContext;
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
@@ -456,6 +465,7 @@ top::Expr ::= e1::Expr e2::Expr
     e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.location, e2.env) ++
     checkStringHeaderDef("remove_string", top.location, top.env);
   
+  e1.env = top.env;
   e2.env = addEnv(e1.defs, e1.env);
   
   local fwrd::Expr =
@@ -474,6 +484,7 @@ abstract production repeatString
 top::Expr ::= e1::Expr e2::Expr
 {
   top.pp = pp"${e1.pp} * ${e2.pp}";
+  propagate controlStmtContext;
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
@@ -483,6 +494,7 @@ top::Expr ::= e1::Expr e2::Expr
     then []
     else [err(e2.location, s"string repeat must have integer type, but got ${showType(e2.typerep)}")];
   
+  e1.env = top.env;
   e2.env = addEnv(e1.defs, e1.env);
   
   local fwrd::Expr =
@@ -501,6 +513,7 @@ abstract production equalsString
 top::Expr ::= e1::Expr e2::Expr
 {
   top.pp = pp"${e1.pp} == ${e2.pp}";
+  propagate controlStmtContext;
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
@@ -508,6 +521,7 @@ top::Expr ::= e1::Expr e2::Expr
     e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.location, e2.env) ++
     checkStringHeaderDef("equals_string", top.location, top.env);
   
+  e1.env = top.env;
   e2.env = addEnv(e1.defs, e1.env);
   
   local fwrd::Expr =
@@ -526,6 +540,7 @@ abstract production subscriptString
 top::Expr ::= e1::Expr e2::Expr
 {
   top.pp = pp"${e1.pp}[${e2.pp}]";
+  propagate controlStmtContext;
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
@@ -535,6 +550,7 @@ top::Expr ::= e1::Expr e2::Expr
     then []
     else [err(e2.location, s"string index must have integer type, but got ${showType(e2.typerep)}")];
   
+  e1.env = top.env;
   e2.env = addEnv(e1.defs, e1.env);
   
   local fwrd::Expr =
@@ -564,6 +580,7 @@ abstract production memberString
 top::Expr ::= lhs::Expr deref::Boolean rhs::Name
 {
   top.pp = parens(ppConcat([lhs.pp, text(if deref then "->" else "."), rhs.pp]));
+  propagate env, controlStmtContext;
 
   local localErrors::[Message] =
     (if !null(lookupRefId("edu:umn:cs:melt:exts:ableC:string:string", top.env))
@@ -584,7 +601,9 @@ abstract production substringString
 top::Expr ::= e1::Expr a::Exprs
 {
   top.pp = pp"${e1.pp}.substring(${ppImplode(pp", ", a.pps)}";
+  propagate controlStmtContext;
   
+  e1.env = top.env;
   a.env = addEnv(e1.defs, e1.env);
   a.expectedTypes = -- size_t
     [builtinType(nilQualifier(), unsignedType(longType())),
