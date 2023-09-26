@@ -56,7 +56,7 @@ top::Def ::=
 abstract production customShowDef
 top::Def ::= t::Type  showFunctionName::Name
 {
-  top.customShowContribs = [pair(t.withoutTypeQualifiers.mangledName, showFunctionName)];
+  top.customShowContribs = [(t.withoutTypeQualifiers.mangledName, showFunctionName)];
 }
 
 function getCustomShow
