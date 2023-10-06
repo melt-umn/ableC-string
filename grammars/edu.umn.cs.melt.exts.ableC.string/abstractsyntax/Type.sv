@@ -254,7 +254,7 @@ aspect production stringType
 top::ExtType ::=
 {
   top.showErrors = checkStringHeaderDef("show_string", _);
-  top.strErrors = \ Decorated Env -> [];
+  top.strErrors = \ _ -> [];
   top.showProd =
     \ e::Expr ->
       directCallExpr(

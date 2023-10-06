@@ -315,7 +315,7 @@ top::StructItemList ::= h::StructItem  t::StructItemList
 aspect production nilStructItem
 top::StructItemList ::=
 {
-  top.showErrors = \ Decorated Env -> [];
+  top.showErrors = \ _ -> [];
   top.showTransforms = [];
 }
 
@@ -346,7 +346,7 @@ top::StructItem ::= d::UnionDecl
 aspect production warnStructItem
 top::StructItem ::= msg::[Message]
 {
-  top.showErrors = \ Decorated Env -> [];
+  top.showErrors = \ _ -> [];
   top.showTransforms = [];
 }
 
@@ -359,7 +359,7 @@ top::StructDeclarators ::= h::StructDeclarator  t::StructDeclarators
 aspect production nilStructDeclarator
 top::StructDeclarators ::=
 {
-  top.showErrors = \ Decorated Env -> [];
+  top.showErrors = \ _ -> [];
   top.showTransforms = [];
 }
 
@@ -400,7 +400,7 @@ top::StructDeclarator ::= name::MaybeName  ty::TypeModifierExpr  e::Expr  attrs:
 aspect production warnStructField
 top::StructDeclarator ::= msg::[Message]
 {
-  top.showErrors = \ Decorated Env -> [];
+  top.showErrors = \ _ -> [];
   top.showTransforms = [];
 }
 
