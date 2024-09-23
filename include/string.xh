@@ -4,7 +4,6 @@
 #include <limits.h>
 #include <setjmp.h>
 #include <signal.h>
-#include <gc.h>
 
 #ifndef _STRING_XH
 #define _STRING_XH
@@ -13,6 +12,21 @@ struct __attribute__((refId("edu:umn:cs:melt:exts:ableC:string:string"))) _strin
   size_t length;
   const char *text;
 };
+
+static const size_t MAX_POINTER_STR_LEN = sizeof(void *) * 2 + 2;
+static const size_t MAX_FLOAT_STR_LEN = 20;
+static const size_t MAX_DOUBLE_STR_LEN = 24;
+static const size_t MAX_LONG_DOUBLE_STR_LEN = 45;
+
+#define MAX_INT_TYPE_STR_LEN(ty) ((CHAR_BIT * sizeof(ty) - 1) / 3 + 2)
+static const size_t MAX_CHAR_STR_LEN = MAX_INT_TYPE_STR_LEN(char);
+static const size_t MAX_SHORT_STR_LEN = MAX_INT_TYPE_STR_LEN(short);
+static const size_t MAX_INT_STR_LEN = MAX_INT_TYPE_STR_LEN(int);
+static const size_t MAX_LONG_STR_LEN = MAX_INT_TYPE_STR_LEN(long);
+static const size_t MAX_LONG_LONG_STR_LEN = MAX_INT_TYPE_STR_LEN(long long);
+
+static const string TRUE_STR = (string)(struct _string_s){4, "true"};
+static const string FALSE_STR = (string)(struct _string_s){5, "false"};
 
 // Functions prefixed with _ are considered internal to the implementation of the extension
 // Other functions are in theory OK to call directly
@@ -48,23 +62,6 @@ static inline string repeat_string(string s, size_t num) {
   return (string)(struct _string_s){s.length * num, result};
 }
 
-static inline string remove_string(string s1, string s2) {
-  size_t i, j;
-  char *result = GC_malloc(s1.length + 1);
-  for (i = 0, j = 0; i < s1.length; i++) {
-    if (i > s1.length - s2.length || strncmp(s1.text + i, s2.text, s2.length)) {
-      result[j] = s1[i];
-      j++;
-    }
-    else {
-      i += s2.length - 1;
-    }
-  }
-  result[j] = '\0';
-
-  return (string)(struct _string_s){j, result};
-}
-
 static inline string substring(string s, size_t start, size_t end) {
   if (start < 0 || start >= s.length || end < 0 || end >= s.length || start > end) {
     fprintf(stderr, "Substring index out of bounds: length %lu, start %lu, end %lu\n", s.length, start, end);
@@ -75,72 +72,63 @@ static inline string substring(string s, size_t start, size_t end) {
   return (string)(struct _string_s){end - start, result};
 }
 
-static inline string str_char_pointer(char *s) {
-  size_t len = strlen(s);
-  char *result = GC_malloc(len + 1);
-  strcpy(result, s);
-  return (string)(struct _string_s){len, result};
-}
-
-static inline string str_char(char c) {
-  char *result = GC_malloc(2);
-  result[0] = c;
-  result[1] = '\0';
-  return (string)(struct _string_s){1, result};
-}
-
-static inline string str_pointer(void *ptr) {
-  char *result = GC_malloc(9);
-  sprintf(result, "%lx", (unsigned long)ptr);
-  return (string)(struct _string_s){strlen(result), result};
-}
-
-static inline string show_string(string s) {
-  char *result = GC_malloc(2 * s.length + 3); // Worst-case size, if all chars are escaped
-  result[0] = '\"';
-  size_t resultIndex = 1;
-  for (size_t i = 0; i < s.length; i++) {
-    char *tmp;
-    switch (s[i]) {
-      case '\a':
-        result[resultIndex++] = '\\';
-        result[resultIndex++] = 'a';
-        break;
-      case '\b':
-        result[resultIndex++] = '\\';
-        result[resultIndex++] = 'b';
-        break;
-      case '\n':
-        result[resultIndex++] = '\\';
-        result[resultIndex++] = 'n';
-        break;
-      case '\r':
-        result[resultIndex++] = '\\';
-        result[resultIndex++] = 'r';
-        break;
-      case '\t':
-        result[resultIndex++] = '\\';
-        result[resultIndex++] = 't';
-        break;
-      case '\v':
-        result[resultIndex++] = '\\';
-        result[resultIndex++] = 'v';
-        break;
-      case '\"':
-    //case '\'':
-      case '\\':
-    //case '\?':
-        result[resultIndex++] = '\\';
-        result[resultIndex++] = s[i];
-        break;
-      default:
-        result[resultIndex++] = s[i];
-    }
+static inline size_t show_char(char *buf, char c) {
+  buf[0] = '\'';
+  size_t bufIndex = 1;
+  switch (c) {
+    case '\a':
+      buf[bufIndex++] = '\\';
+      buf[bufIndex++] = 'a';
+      break;
+    case '\b':
+      buf[bufIndex++] = '\\';
+      buf[bufIndex++] = 'b';
+      break;
+    case '\n':
+      buf[bufIndex++] = '\\';
+      buf[bufIndex++] = 'n';
+      break;
+    case '\r':
+      buf[bufIndex++] = '\\';
+      buf[bufIndex++] = 'r';
+      break;
+    case '\t':
+      buf[bufIndex++] = '\\';
+      buf[bufIndex++] = 't';
+      break;
+    case '\v':
+      buf[bufIndex++] = '\\';
+      buf[bufIndex++] = 'v';
+      break;
+    case '\"':
+    case '\'':
+    case '\\':
+  //case '\?':
+      buf[bufIndex++] = '\\';
+      buf[bufIndex++] = c;
+      break;
+    default:
+      buf[bufIndex++] = c;
   }
-  result[resultIndex++] = '\"';
-  result[resultIndex] = '\0';
+  buf[bufIndex++] = '\'';
+  buf[bufIndex] = '\0';
 
-  return (string)(struct _string_s){resultIndex, result};
+  return bufIndex;
+}
+
+static inline size_t show_string_max_len(string s) {
+  return 2 * s.length + 3;  // Worst-case size, if all chars are escaped
+}
+
+static inline size_t show_string(char *buf, string s) {
+  buf[0] = '\"';
+  size_t bufIndex = 1;
+  for (size_t i = 0; i < s.length; i++) {
+    bufIndex += show_char(buf + bufIndex, s.text[i]);
+  }
+  buf[bufIndex++] = '\"';
+  buf[bufIndex] = '\0';
+  return bufIndex;
 }
 
 // Hacky way of testing if a pointer can be dereferenced validly
@@ -175,9 +163,9 @@ static inline void _clear_handler() {
   }
 }
 
-static inline string show_char_pointer(char *s) {
+static inline size_t show_char_pointer_max_len(char *s) {
   _Bool illegal = 0;
-        
+
   // Hacky way of testing if a pointer can be dereferenced validly
   // TODO: This isn't remotely thread safe, but I don't know of a better way
   if (s) {
@@ -193,74 +181,35 @@ static inline string show_char_pointer(char *s) {
   }
   
   if (illegal) {
-    char *result = GC_malloc(35);
-    sprintf(result, "<char * at 0x%lx>", (unsigned long)s);
-    return (string)(struct _string_s){strlen(result), result};
+    return 35;
   } else {
-    return show_string(str_char_pointer(s));
+    return 2 * strlen(s) + 1;
   }
 }
 
-static inline string show_bool(_Bool b) {
-  char *result = b? "true" : "false";
-  return (string)(struct _string_s){strlen(result), result};
-}
+static inline size_t show_char_pointer(char *buf, char *s) {
+  _Bool illegal = 0;
 
-static inline string show_int(int i) {
-  char *result = GC_malloc((CHAR_BIT * sizeof(i) - 1) / 3 + 2);
-  sprintf(result, "%d", i);
-  return (string)(struct _string_s){strlen(result), result};
-}
-
-static inline string show_float(double f) {
-  char *result = GC_malloc((CHAR_BIT * sizeof(f) - 1) / 3 + 2);
-  sprintf((char*)result, "%g", f);
-  return (string)(struct _string_s){strlen(result), result};
-}
-
-static inline string show_char(char c) {
-  char *result = GC_malloc(5); // Worst-case size, if char is escaped
-  result[0] = '\'';
-  size_t resultIndex = 1;
-  switch (c) {
-    case '\a':
-      result[resultIndex++] = '\\';
-      result[resultIndex++] = 'a';
-      break;
-    case '\b':
-      result[resultIndex++] = '\\';
-      result[resultIndex++] = 'b';
-      break;
-    case '\n':
-      result[resultIndex++] = '\\';
-      result[resultIndex++] = 'n';
-      break;
-    case '\r':
-      result[resultIndex++] = '\\';
-      result[resultIndex++] = 'r';
-      break;
-    case '\t':
-      result[resultIndex++] = '\\';
-      result[resultIndex++] = 't';
-      break;
-    case '\v':
-      result[resultIndex++] = '\\';
-      result[resultIndex++] = 'v';
-      break;
-    case '\"':
-    case '\'':
-    case '\\':
-  //case '\?':
-      result[resultIndex++] = '\\';
-      result[resultIndex++] = c;
-      break;
-    default:
-      result[resultIndex++] = c;
+  // Hacky way of testing if a pointer can be dereferenced validly
+  // TODO: This isn't remotely thread safe, but I don't know of a better way
+  if (s) {
+    _set_handler();
+    if (!setjmp(_jump)) {
+      volatile char val = *s;
+    } else {
+      illegal = 1;
+    }
+    _clear_handler();
+  } else {
+    illegal = 1;
   }
-  result[resultIndex++] = '\'';
-  result[resultIndex] = '\0';
-
-  return (string)(struct _string_s){resultIndex, result};
+  
+  if (illegal) {
+    sprintf(buf, "<char * at 0x%lx>", (unsigned long)s);
+    return strlen(buf);
+  } else {
+    return show_string((string)(struct _string_s){strlen(s), s});
+  }
 }
 
 #endif

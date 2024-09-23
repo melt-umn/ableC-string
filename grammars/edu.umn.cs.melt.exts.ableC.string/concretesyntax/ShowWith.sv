@@ -7,14 +7,14 @@ marking terminal Show_t 'show' lexer classes {Keyword, Global};
 terminal With_t 'with' lexer classes {Keyword};
 
 concrete productions top::ExternalDeclaration_c
-| 'show' '(' ty::TypeName_c ')' 'with' show::Identifier_t
-    { top.ast = showWithDecl(ty.ast, fromId(show)); }
-| 'show' id::TypeName_t 'with' show::Identifier_t
+| 'show' '(' ty::TypeName_c ')' 'with' showMaxLen::Identifier_t ',' show::Identifier_t
+    { top.ast = showWithDecl(ty.ast, fromId(showMaxLen), fromId(show)); }
+| 'show' id::TypeName_t 'with' showMaxLen::Identifier_t ',' show::Identifier_t
     { local ty::TypeName = typeName(typedefTypeExpr(nilQualifier(), fromTy(id)), baseTypeExpr());
-      top.ast = showWithDecl(ty, fromId(show)); }
-| 'show' kwd::TagKeyword_c id::TypeName_t 'with' show::Identifier_t
+      top.ast = showWithDecl(^ty, fromId(showMaxLen), fromId(show)); }
+| 'show' kwd::TagKeyword_c id::TypeName_t 'with' showMaxLen::Identifier_t ',' show::Identifier_t
     { local ty::TypeName = typeName(kwd.ast(fromTy(id)), baseTypeExpr());
-      top.ast = showWithDecl(ty, fromId(show)); }
+      top.ast = showWithDecl(^ty, fromId(showMaxLen), fromId(show)); }
 
 closed tracked nonterminal TagKeyword_c with ast<(BaseTypeExpr ::= Name)>;
 

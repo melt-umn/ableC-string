@@ -22,6 +22,8 @@ struct baz {
   struct baz *t;
 };
 
+allocate_using heap;
+
 int main(int argc, char **argv) {
   string a = str("abc");
   printf("a: %s\n", a.text);
