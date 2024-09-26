@@ -25,8 +25,8 @@ static const size_t MAX_INT_STR_LEN = MAX_INT_TYPE_STR_LEN(int);
 static const size_t MAX_LONG_STR_LEN = MAX_INT_TYPE_STR_LEN(long);
 static const size_t MAX_LONG_LONG_STR_LEN = MAX_INT_TYPE_STR_LEN(long long);
 
-static const string TRUE_STR = (string)(struct _string_s){4, "true"};
-static const string FALSE_STR = (string)(struct _string_s){5, "false"};
+static const struct _string_s TRUE_STR = {4, "true"};
+static const struct _string_s FALSE_STR = {5, "false"};
 
 // Functions prefixed with _ are considered internal to the implementation of the extension
 // Other functions are in theory OK to call directly
@@ -43,38 +43,21 @@ static inline char subscript_string(string s, size_t i) {
 }
 
 static inline _Bool equals_string(string s1, string s2) {
-  return !strcmp(s1.text, s2.text);
+  return s1.length == s2.length && !strcmp(s1.text, s2.text);
 }
 
-static inline string concat_string(string s1, string s2) {
-  char *result = GC_malloc(s1.length + s2.length + 1); // + 1 for NULL char
-  strcpy(result, s1.text);
-  strcat(result, s2.text);
-  return (string)(struct _string_s){s1.length + s2.length, result};
-}
+// static inline string substring(string s, size_t start, size_t end) {
+//   if (start < 0 || start >= s.length || end < 0 || end >= s.length || start > end) {
+//     fprintf(stderr, "Substring index out of bounds: length %lu, start %lu, end %lu\n", s.length, start, end);
+//     abort();
+//   }
+//   char *result = GC_malloc(end - start + 1);
+//   strncpy(result, s.text + start, end - start);
+//   return (string)(struct _string_s){end - start, result};
+// }
 
-static inline string repeat_string(string s, size_t num) {
-  char *result = GC_malloc(s.length * num + 1);
-  result[0] = '\0';
-  size_t i;
-  for (size_t i = 0; i < num; i++)
-    strcat(result, s.text);
-  return (string)(struct _string_s){s.length * num, result};
-}
-
-static inline string substring(string s, size_t start, size_t end) {
-  if (start < 0 || start >= s.length || end < 0 || end >= s.length || start > end) {
-    fprintf(stderr, "Substring index out of bounds: length %lu, start %lu, end %lu\n", s.length, start, end);
-    abort();
-  }
-  char *result = GC_malloc(end - start + 1);
-  strncpy(result, s.text + start, end - start);
-  return (string)(struct _string_s){end - start, result};
-}
-
-static inline size_t show_char(char *buf, char c) {
-  buf[0] = '\'';
-  size_t bufIndex = 1;
+static inline size_t escape_char(char *buf, char c) {
+  size_t bufIndex = 0;
   switch (c) {
     case '\a':
       buf[bufIndex++] = '\\';
@@ -110,6 +93,15 @@ static inline size_t show_char(char *buf, char c) {
     default:
       buf[bufIndex++] = c;
   }
+  buf[bufIndex] = '\0';
+
+  return bufIndex;
+}
+
+static inline size_t show_char(char *buf, char c) {
+  size_t bufIndex = 0;
+  buf[bufIndex++] = '\'';
+  bufIndex += escape_char(buf + bufIndex, c);
   buf[bufIndex++] = '\'';
   buf[bufIndex] = '\0';
 
@@ -124,7 +116,7 @@ static inline size_t show_string(char *buf, string s) {
   buf[0] = '\"';
   size_t bufIndex = 1;
   for (size_t i = 0; i < s.length; i++) {
-    bufIndex += show_char(buf + bufIndex, s.text[i]);
+    bufIndex += escape_char(buf + bufIndex, s.text[i]);
   }
   buf[bufIndex++] = '\"';
   buf[bufIndex] = '\0';
@@ -133,15 +125,16 @@ static inline size_t show_string(char *buf, string s) {
 
 // Hacky way of testing if a pointer can be dereferenced validly
 // TODO: This isn't remotely thread safe, but I don't know of a better way
-static jmp_buf _jump;
+static jmp_buf _segv_jmp_buf;
 static void _handle_sig(int sig) {
-  longjmp(_jump, 1);
+  longjmp(_segv_jmp_buf, 1);
 }
 
 static struct sigaction _old_segv, _old_bus;
 static inline void _set_handler() {
   struct sigaction sa;
   sa.sa_handler = _handle_sig;
+  sa.sa_flags |= SA_NODEFER;
   sigemptyset(&sa.sa_mask);
   if (sigaction(SIGSEGV, &sa, &_old_segv)) {
     perror("Couldn't set dereference SIGSEGV handler");
@@ -163,52 +156,47 @@ static inline void _clear_handler() {
   }
 }
 
-static inline size_t show_char_pointer_max_len(char *s) {
-  _Bool illegal = 0;
-
-  // Hacky way of testing if a pointer can be dereferenced validly
-  // TODO: This isn't remotely thread safe, but I don't know of a better way
-  if (s) {
+static void *safe_memcpy(void *dest, const void *src, size_t n) {
+  void *res = NULL;
+  if (src) {
     _set_handler();
-    if (!setjmp(_jump)) {
-      volatile char val = *s;
-    } else {
-      illegal = 1;
+    if (!setjmp(_segv_jmp_buf)) {
+      res = memcpy(dest, src, n);
     }
     _clear_handler();
-  } else {
-    illegal = 1;
   }
-  
-  if (illegal) {
-    return 35;
-  } else {
+  return res;
+}
+
+static size_t safe_strlen(const char *s) {
+  size_t len = -1;
+  if (s) {
+    _set_handler();
+    if (!setjmp(_segv_jmp_buf)) {
+      len = strlen(s);
+    }
+    _clear_handler();
+  }
+  return len;
+}
+
+static inline size_t show_char_pointer_max_len(char *s) {
+  size_t len = safe_strlen(s);
+
+  if (len != -1) {
     return 2 * strlen(s) + 1;
+  } else {
+    return 35;
   }
 }
 
 static inline size_t show_char_pointer(char *buf, char *s) {
-  _Bool illegal = 0;
-
-  // Hacky way of testing if a pointer can be dereferenced validly
-  // TODO: This isn't remotely thread safe, but I don't know of a better way
-  if (s) {
-    _set_handler();
-    if (!setjmp(_jump)) {
-      volatile char val = *s;
-    } else {
-      illegal = 1;
-    }
-    _clear_handler();
-  } else {
-    illegal = 1;
-  }
+  size_t len = safe_strlen(s);
   
-  if (illegal) {
-    sprintf(buf, "<char * at 0x%lx>", (unsigned long)s);
-    return strlen(buf);
+  if (len != -1) {
+    return show_string(buf, (string)(struct _string_s){len, s});
   } else {
-    return show_string((string)(struct _string_s){strlen(s), s});
+    return sprintf(buf, "<char * at %p>", (void*)s);
   }
 }
 

@@ -13,6 +13,54 @@ imports edu:umn:cs:melt:ableC:abstractsyntax:builtins;
 
 imports edu:umn:cs:melt:exts:ableC:allocation:abstractsyntax;
 
+synthesized attribute buildStr::((Stmt, Expr, Stmt) ::= Name Name) occurs on Expr;
+
+function wrapBuildStr
+Expr ::= buildStr::((Stmt, Expr, Stmt) ::= Name Name)
+{
+  nondecorated local bufName::Name = freshName("buf");
+  nondecorated local lenName::Name = freshName("len");
+  local impls::(Stmt, Expr, Stmt) = buildStr(bufName, lenName);
+  
+  return ableC_Expr {
+    proto_typedef size_t;
+    ({$Stmt{impls.1}
+      char *$Name{bufName} = allocate($Expr{impls.2} + 1);
+      size_t $Name{lenName} = 0;
+      $Stmt{impls.3}
+      ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){
+        $Name{lenName}, $Name{bufName}
+      };})
+  };
+}
+
+function defaultBuildStr
+(Stmt, Expr, Stmt) ::= top::Decorated Expr buf::Name len::Name
+{
+  local type::Type = top.typerep.defaultFunctionArrayLvalueConversion;
+  nondecorated local tmpName::Name = freshName("str");
+  nondecorated local tmpRef::Expr = if top.isSimple then ^top else declRefExpr(tmpName);
+  return (
+    if top.isSimple then nullStmt() else declStmt(autoDecl(tmpName, ^top)),
+    type.strMaxLenProd(tmpRef),
+    ableC_Stmt { $Name{^len} += $Expr{type.strProd(ableC_Expr { $Name{^buf} + $Name{^len} }, tmpRef)}; });
+}
+
+aspect default production
+top::Expr ::=
+{
+  top.buildStr = defaultBuildStr(top, _, _);
+}
+
+aspect production stmtExpr
+top::Expr ::= s::Stmt e::Expr
+{
+  top.buildStr = \ buf::Name len::Name ->
+    let buildE::(Stmt, Expr, Stmt) = e.buildStr(buf, len)
+    in (seqStmt(^s, buildE.1), buildE.2, buildE.3)
+    end;
+}
+
 aspect function getInitialEnvDefs
 [Def] ::=
 {
@@ -32,12 +80,12 @@ aspect function getInitialEnvDefs
 production singleArgExtCallExpr implements ReferenceCall
 top::Expr ::= f::Name @a::Exprs handler::(Expr ::= Expr)
 {
-  top.pp = pp"${f.pp}(${ppImplode(pp", ", a.pps)})";
-  forwards to bindDirectCallExpr(\ es::[Expr] ->
+  top.pp = forwardParent.pp;
+  forwards to bindDirectCallExpr(^f, a, \ es::[Expr] ->
     case es of
     | [e] -> handler(e)
     | _ -> errorExpr([errFromOrigin(top, s"${f.name} expected exactly 1 argument, got ${toString(a.count)}")])
-    end)(^f, a);
+    end);
 }
 
 production strExpr
@@ -45,85 +93,135 @@ top::Expr ::= e::Expr
 {
   top.pp = pp"str(${e.pp})";
   propagate env, controlStmtContext;
-  
+  top.typerep = extType(nilQualifier(), stringType());
+
+  top.buildStr = \ buf::Name len::Name -> (
+    nullStmt(), type.strMaxLenProd(^e),
+    ableC_Stmt {
+      $Name{len} += $Expr{type.strProd(ableC_Expr { $Name{buf} + $Name{len} }, ^e)};
+    });
+
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
   local localErrors::[Message] = e.errors ++ type.strErrors(e.env) ++
     case top.env.allocContext of
     | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
     | _ -> []
     end;
-  local fwrd::Expr = type.strProd(^e); -- Unavoidable re-decoration here, since we don't know what env strProd will provide to e
+  local fwrd::Expr = type.directStrProd(^e);
   forwards to mkErrorCheck(localErrors, @fwrd);
 }
 
-production strCharPointer
+production directStrExpr
+top::Expr ::= e::Expr strMaxLenProd::(Expr ::= Expr) strProd::(Expr ::= Expr Expr)
+{
+  attachNote extensionGenerated("ableC-string");
+  propagate env, controlStmtContext;
+  nondecorated local bufName::Name = freshName("buf");
+  forwards to ableC_Expr {
+    proto_typedef size_t;
+    ({char *$Name{bufName} = allocate($Expr{strMaxLenProd(^e)} + 1);
+      ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){
+        $Expr{strProd(directRefExpr(bufName), ^e)}, $Name{bufName}
+      };})
+  };
+}
+
+production strStringMaxLen
 top::Expr ::= e::Expr
 {
   attachNote extensionGenerated("ableC-string");
-  nondecorated local bufName::Name = freshName("buf");
+  forwards to ableC_Expr { $Expr{@e}.length };
+}
+
+production strString
+top::Expr ::= buf::Expr e::Expr
+{
+  attachNote extensionGenerated("ableC-string");
+  forwards to ableC_Expr { sprintf($Expr{@buf}, "%s", $Expr{@e}.text) };
+}
+
+production directStrCharPointer
+top::Expr ::= e::Expr
+{
+  top.pp = pp"strCharPointer(${e.pp})";
+  attachNote extensionGenerated("ableC-string");
+
+  forward nonConst = directStrExpr(@e, strCharPointerMaxLen, strCharPointer);
   forwards to
-    ableC_Expr {
-      ({char *$Name{bufName} = allocate(strlen($Expr{@e}) + 1);
-        strcpy($Name{bufName}, $Expr{^e});
+    case e of
+    | stringLiteral(l) -> ableC_Expr {
         ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){
-          strlen($Name{bufName}), $Name{bufName}
-        };})
-    };
+          $Expr{mkIntConst(length(unescapeString(l)) - 2)}, $Expr{^e}
+        }
+      }
+    | _ -> @nonConst
+    end;
+}
+
+production strCharPointerMaxLen
+top::Expr ::= e::Expr
+{
+  attachNote extensionGenerated("ableC-string");
+  forwards to ableC_Expr { strlen($Expr{@e}) };
+}
+
+production strCharPointer
+top::Expr ::= buf::Expr e::Expr
+{
+  attachNote extensionGenerated("ableC-string");
+  forwards to ableC_Expr { sprintf($Expr{@buf}, "%s", $Expr{@e}) };
 }
 
 production strChar
-top::Expr ::= e::Expr
+top::Expr ::= buf::Expr e::Expr
 {
   attachNote extensionGenerated("ableC-string");
-  nondecorated local bufName::Name = freshName("buf");
   forwards to
     ableC_Expr {
-      ({char *$Name{bufName} = allocate(2);
-        $Name{bufName}[0] = $Expr{@e};
-        $Name{bufName}[1] = '\0';
-        ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){
-          1, &$Name{bufName}
-        };})
+      $Expr{@buf}[0] = $Expr{^e},
+      $Expr{^buf}[1] = '\0',
+      1
     };
 }
 
 production strPointer
-top::Expr ::= e::Expr
+top::Expr ::= buf::Expr e::Expr
 {
   attachNote extensionGenerated("ableC-string");
-  nondecorated local bufName::Name = freshName("buf");
   forwards to
     ableC_Expr {
-      ({char *$Name{bufName} = allocate(MAX_POINTER_STR_LEN + 1);
-        sprintf($Name{bufName}, "%p", $Expr{@e});
-        ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){
-          strlen($Name{bufName}), $Name{bufName}
-        };})
+      sprintf($Expr{@buf}, "%p", (void*)$Expr{@e})
     };
 }
 
-production strBool
+production directStrBool
 top::Expr ::= e::Expr
+{
+  attachNote extensionGenerated("ableC-string");
+  forwards to explicitCastExpr(
+    typeName(stringTypeExpr(nilQualifier()), baseTypeExpr()),
+    ableC_Expr {
+      $Expr{@e}? TRUE_STR : FALSE_STR
+    });
+}
+
+production strBool
+top::Expr ::= buf::Expr e::Expr
 {
   attachNote extensionGenerated("ableC-string");
   forwards to
     ableC_Expr {
-      $Expr{@e}? TRUE_STR : FALSE_STR
+      sprintf($Expr{@buf}, "%s", $Expr{@e}? "true" : "false")
     };
 }
 
 production strNum
-top::Expr ::= e::Expr width::Expr fmt::String
+top::Expr ::= buf::Expr e::Expr fmt::String
 {
   attachNote extensionGenerated("ableC-string");
-  nondecorated local bufName::Name = freshName("buf");
   forwards to
     ableC_Expr {
-      ({char *$Name{bufName} = allocate($Expr{@width} + 1);
-        sprintf($Name{bufName}, $stringLiteralExpr{fmt}, $Expr{@e});
-        ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){
-          strlen($Name{bufName}), $Name{bufName}
-        };})
+      sprintf($Expr{@buf}, $stringLiteralExpr{fmt}, $Expr{@e})
     };
 }
 
@@ -133,6 +231,7 @@ top::Expr ::= e::Expr
   top.pp = pp"show(${e.pp})";
   attachNote extensionGenerated("ableC-string");
   propagate env, controlStmtContext;
+  top.typerep = extType(nilQualifier(), stringType());
   
   nondecorated local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
   local localErrors::[Message] = e.errors ++ showErrors(top.env, type) ++
@@ -141,17 +240,13 @@ top::Expr ::= e::Expr
     | _ -> []
     end;
 
-  nondecorated local lenName::Name = freshName("len");
-  nondecorated local bufName::Name = freshName("buf");
-  local fwrd::Expr = ableC_Expr {
-    proto_typedef size_t;
-    ({char *$Name{bufName} = allocate($Expr{getShowMaxLen(^e, top.env, type)} + 1);
-      size_t $Name{lenName} = $Expr{getShow(declRefExpr(bufName), ^e, top.env, type)};
-      ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){
-        $Name{lenName}, $Name{bufName}
-      };})
-  };
-  forwards to mkErrorCheck(localErrors, @fwrd);
+  top.buildStr = \ buf::Name len::Name -> (
+    nullStmt(), getShowMaxLen(^e, top.env, type),
+    ableC_Stmt {
+      $Name{len} += $Expr{getShow(ableC_Expr { $Name{buf} + $Name{len} }, ^e, top.env, type)};
+    });
+
+  forwards to mkErrorCheck(localErrors, wrapBuildStr(top.buildStr));
 }
 
 fun showErrors [Message] ::= env::Env type::Type =
@@ -171,27 +266,6 @@ fun getShow Expr ::= buf::Expr e::Expr env::Env type::Type =
   | just((_, func)) -> ableC_Expr { $Name{func}($Expr{buf}, $Expr{e}) }
   | nothing() -> type.showProd(buf, e)
   end;
-
-production showBool
-top::Expr ::= buf::Expr e::Expr
-{
-  attachNote extensionGenerated("ableC-string");
-  forwards to
-    ableC_Expr {
-      strcpy($Expr{@buf}, $Expr{@e}? "true" : "false")
-    };
-}
-
-production showNum
-top::Expr ::= buf::Expr e::Expr fmt::String
-{
-  attachNote extensionGenerated("ableC-string");
-  forwards to
-    ableC_Expr {
-      sprintf($Expr{@buf}, $stringLiteralExpr{fmt}, $Expr{@e}),
-      strlen($Expr{^buf})
-    };
-}
 
 production showCharPointerMaxLen
 top::Expr ::= e::Expr
@@ -216,12 +290,12 @@ top::Expr ::= buf::Expr e::Expr
 }
 
 synthesized attribute maxEnumItemLen::Integer;
-attribute strProd, maxEnumItemLen, showProd occurs on EnumDecl, EnumItemList;
+attribute directStrProd, maxEnumItemLen, showProd occurs on EnumDecl, EnumItemList;
 
 aspect production enumDecl
 top::EnumDecl ::= name::MaybeName  dcls::EnumItemList
 {
-  top.strProd = dcls.strProd;
+  top.directStrProd = dcls.directStrProd;
   top.maxEnumItemLen = dcls.maxEnumItemLen;
   top.showProd = dcls.showProd;
 }
@@ -231,11 +305,11 @@ top::EnumItemList ::= h::EnumItem  t::EnumItemList
 {
   attachNote extensionGenerated("ableC-string");
 
-  top.strProd = \ e::Expr ->
+  top.directStrProd = \ e::Expr ->
     ableC_Expr {
       $Expr{e} == $name{h.name}?
         $Expr{strExpr(mkStringConst(h.name))} :
-        $Expr{t.strProd(e)}
+        $Expr{t.directStrProd(e)}
     };
   top.maxEnumItemLen = max(length(h.name), t.maxEnumItemLen);
   top.showProd = \ buf::Expr e::Expr ->
@@ -251,12 +325,11 @@ top::EnumItemList ::=
 {
   attachNote extensionGenerated("ableC-string");
 
-  top.strProd = strNum(_, ableC_Expr { MAX_INT_STR_LEN }, "%d");
+  top.directStrProd = signedType(intType()).directStrProd;
   top.maxEnumItemLen = length(show(80, top.containingEnum)) + 24;
   top.showProd = \ buf::Expr e::Expr ->
     ableC_Expr {
-      sprintf($Expr{buf}, "<%s %d>", $stringLiteralExpr{show(80, top.containingEnum)}, $Expr{e}),
-      strlen($Expr{buf})
+      sprintf($Expr{buf}, "<%s %d>", $stringLiteralExpr{show(80, top.containingEnum)}, $Expr{e})
     };
 }
 
@@ -265,6 +338,8 @@ top::Expr ::= e::Expr
 {
   attachNote extensionGenerated("ableC-string");
   top.pp = pp"showPointerMaxLen(${e})";
+  e.env = top.env;
+  e.controlStmtContext = top.controlStmtContext;
   
   local subType::Type =
     case e.typerep of
@@ -275,25 +350,9 @@ top::Expr ::= e::Expr
   forwards to
     ableC_Expr {
       ({$directTypeExpr{subType.withoutTypeQualifiers} $Name{ptrValName};
-        _Bool _illegal = 0;
-        
-        // Hacky way of testing if a pointer can be dereferenced validly
-        // TODO: This isn't remotely thread safe, but I don't know of a better way
-        if($Expr{@e}) {
-          _set_handler();
-          if (!setjmp(_jump)) {
-            $Name{ptrValName} = *$Expr{^e};
-          } else {
-            _illegal = 1;
-          }
-          _clear_handler();
-        } else {
-          _illegal = 1;
-        }
-
-        _illegal?
-          $intLiteralExpr{length(show(80, e.typerep)) + 6} + MAX_POINTER_STR_LEN :
-          $Expr{subType.showMaxLenProd(ableC_Expr { $Name{ptrValName} })} + 1;})
+        safe_memcpy(&$Name{ptrValName}, $Expr{^e}, sizeof($directTypeExpr{subType.withoutTypeQualifiers}))?
+          $Expr{subType.showMaxLenProd(ableC_Expr { $Name{ptrValName} })} + 1 :
+          $intLiteralExpr{length(show(80, e.typerep)) + 6} + MAX_POINTER_STR_LEN;})
     };
 }
 
@@ -314,29 +373,11 @@ top::Expr ::= buf::Expr e::Expr
   forwards to
     ableC_Expr {
       ({$directTypeExpr{subType.withoutTypeQualifiers} $Name{ptrValName};
-        _Bool _illegal = 0;
-        
-        // Hacky way of testing if a pointer can be dereferenced validly
-        // TODO: This isn't remotely thread safe, but I don't know of a better way
-        if($Expr{^e}) {
-          _set_handler();
-          if (!setjmp(_jump)) {
-            $Name{ptrValName} = *$Expr{^e};
-          } else {
-            _illegal = 1;
-          }
-          _clear_handler();
-        } else {
-          _illegal = 1;
-        }
-        
-        if (_illegal) {
-          sprintf($Expr{@buf}, "<%s at %p>", $stringLiteralExpr{show(80, e.typerep)}, $Expr{^e});
-        } else {
-          buf[0] = '&';
-          $Expr{subType.showProd(ableC_Expr { $Name{ptrValName} }, ableC_Expr { $Expr{^buf} + 1 })};
-        }
-        strlen($Expr{^buf});})
+        safe_memcpy(&$Name{ptrValName}, $Expr{^e}, sizeof($directTypeExpr{subType.withoutTypeQualifiers}))?
+          ($Expr{^buf}[0] = '&',
+           1 + $Expr{subType.showProd(ableC_Expr { $Expr{^buf} + 1 }, declRefExpr(ptrValName))}) :
+          sprintf($Expr{@buf}, "<%s at %p>", $stringLiteralExpr{show(80, e.typerep)}, (void*)$Expr{^e});
+      })
     };
 }
 
@@ -345,7 +386,7 @@ top::Expr ::= e::Expr
 {
   attachNote extensionGenerated("ableC-string");
   top.pp = pp"showOpaquePointerMaxLen(${e})";
-  
+
   propagate env, controlStmtContext;
 
   local subType::Type =
@@ -364,7 +405,7 @@ top::Expr ::= buf::Expr e::Expr
 {
   attachNote extensionGenerated("ableC-string");
   top.pp = pp"showOpaquePointer(${buf}, ${e})";
-  
+
   local subType::Type =
     case e.typerep of
     | pointerType(_, t) -> ^t
@@ -372,17 +413,17 @@ top::Expr ::= buf::Expr e::Expr
     end;
   forwards to
     ableC_Expr {
-      ({sprintf($Expr{@buf}, "<%s at %p>", $stringLiteralExpr{show(80, e.typerep)}, $Expr{@e});
-        strlen($Expr{^buf});})
+      sprintf($Expr{@buf}, "<%s at %p>", $stringLiteralExpr{show(80, e.typerep)}, (void*)$Expr{@e})
     };
 }
 
 production showStructMaxLen
-top::Expr ::= buf::Expr e::Expr
+top::Expr ::= e::Expr
 {
   attachNote extensionGenerated("ableC-string");
-  top.pp = pp"showStructMaxLen(${buf}, ${e})";
-  
+  top.pp = pp"showStructMaxLen(${e})";
+  propagate env;
+
   local decl::Decorated StructDecl =
     case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
     | structRefIdItem(decl) :: _ -> decl
@@ -392,7 +433,7 @@ top::Expr ::= buf::Expr e::Expr
   forwards to
     injectGlobalDeclsExpr(
       foldDecl([maybeValueDecl(decl.showMaxLenFnName, decls(decl.showMaxLenFnDecls))]),
-      ableC_Expr { $name{decl.showMaxLenFnName}($Expr{@buf}, $Expr{@e}) });
+      ableC_Expr { $name{decl.showMaxLenFnName}($Expr{^e}) });
 }
 
 production showStruct
@@ -400,7 +441,8 @@ top::Expr ::= buf::Expr e::Expr
 {
   attachNote extensionGenerated("ableC-string");
   top.pp = pp"showStruct(${buf}, ${e})";
-  
+  propagate env;
+
   local decl::Decorated StructDecl =
     case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
     | structRefIdItem(decl) :: _ -> decl
@@ -410,14 +452,15 @@ top::Expr ::= buf::Expr e::Expr
   forwards to
     injectGlobalDeclsExpr(
       foldDecl([maybeValueDecl(decl.showFnName, decls(decl.showFnDecls))]),
-      ableC_Expr { $name{decl.showFnName}($Expr{@buf}, $Expr{@e}) });
+      ableC_Expr { $name{decl.showFnName}($Expr{@buf}, $Expr{^e}) });
 }
 
 production showUnionMaxLen
-top::Expr ::= buf::Expr e::Expr
+top::Expr ::= e::Expr
 {
   attachNote extensionGenerated("ableC-string");
-  top.pp = pp"showUnionMaxLen(${buf}, ${e})";
+  top.pp = pp"showUnionMaxLen(${e})";
+  propagate env;
   
   local decl::Decorated UnionDecl =
     case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
@@ -428,7 +471,7 @@ top::Expr ::= buf::Expr e::Expr
   forwards to
     injectGlobalDeclsExpr(
       foldDecl([maybeValueDecl(decl.showMaxLenFnName, decls(decl.showMaxLenFnDecls))]),
-      ableC_Expr { $name{decl.showMaxLenFnName}($Expr{@buf}, $Expr{@e}) });
+      ableC_Expr { $name{decl.showMaxLenFnName}($Expr{^e}) });
 }
 
 production showUnion
@@ -436,6 +479,7 @@ top::Expr ::= buf::Expr e::Expr
 {
   attachNote extensionGenerated("ableC-string");
   top.pp = pp"showUnion(${buf}, ${e})";
+  propagate env;
   
   local decl::Decorated UnionDecl =
     case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
@@ -446,7 +490,7 @@ top::Expr ::= buf::Expr e::Expr
   forwards to
     injectGlobalDeclsExpr(
       foldDecl([maybeValueDecl(decl.showFnName, decls(decl.showFnDecls))]),
-      ableC_Expr { $name{decl.showFnName}($Expr{@buf}, $Expr{@e}) });
+      ableC_Expr { $name{decl.showFnName}($Expr{@buf}, $Expr{^e}) });
 }
 
 synthesized attribute showDeclErrors::([Message] ::= Env) occurs on StructDecl, UnionDecl;
@@ -454,24 +498,24 @@ synthesized attribute showMaxLenFnName::String occurs on StructDecl, UnionDecl;
 synthesized attribute showFnName::String occurs on StructDecl, UnionDecl;
 synthesized attribute showMaxLenFnDecls::Decls occurs on StructDecl, UnionDecl;
 synthesized attribute showFnDecls::Decls occurs on StructDecl, UnionDecl;
-monoid attribute showMaxLenTransform::(Expr ::= Expr) with \ _ -> mkIntConst(0), joinMaxLen;
-monoid attribute showTransform::(Stmt ::= Expr) with \ _ -> nullStmt(), joinShowFields;
+monoid attribute showMaxLenTransform::(Expr ::= Expr) with pure(mkIntConst(0)), lift2(joinMaxLens, _, _);
+monoid attribute showTransform::([Stmt] ::= Expr);
 attribute showErrors, showMaxLenTransform, showTransform occurs on StructDecl, UnionDecl, StructItemList, StructItem, StructDeclarators, StructDeclarator;
 propagate showErrors, showMaxLenTransform on StructDecl, UnionDecl;
 propagate showErrors, showMaxLenTransform, showTransform on StructItemList, StructItem, StructDeclarators;
 
-fun joinMaxLen (Expr ::= Expr) ::= e1::(Expr ::= Expr) e2::(Expr ::= Expr) =
-  \ e::Expr -> ableC_Expr {
-    $Expr{e1(e)} + $Expr{e2(e)}
-  };
+fun joinMaxLens Expr ::= e1::Expr e2::Expr =
+  ableC_Expr { $Expr{e1} + 2 + $Expr{e2} };
 
-fun joinShowFields (Stmt ::= Expr) ::= s1::(Stmt ::= Expr) s2::(Stmt ::= Expr) =
-  \ e::Expr -> ableC_Stmt {
-    $Stmt{s1(e)}
-    buf[bufIndex++] = ',';
-    buf[bufIndex++] = ' ';
-    $Stmt{s2(e)}
-  };
+fun foldShowItems Stmt ::= ss::[Stmt] =
+  if null(ss) then nullStmt()
+  else foldr1(\ s1 s2 ->
+    ableC_Stmt {
+      $Stmt{s1}
+      buf[bufIndex++] = ',';
+      buf[bufIndex++] = ' ';
+      $Stmt{s2}
+    }, ss);
 
 aspect production structDecl
 top::StructDecl ::= attrs::Attributes  name::MaybeName  dcls::StructItemList
@@ -507,15 +551,17 @@ top::StructDecl ::= attrs::Attributes  name::MaybeName  dcls::StructItemList
       static size_t $name{top.showFnName}(char *, struct $name{n});
       static size_t $name{top.showFnName}(char *buf, struct $name{n} val) {
         size_t bufIndex = 0;
-        $Stmt{top.showTransform(ableC_Expr { val })}
+        $Stmt{foldShowItems(top.showTransform(ableC_Expr { val }))}
+        buf[bufIndex] = '\0';
         return bufIndex;
       }
     };
-  top.showTransform := \ e::Expr -> ableC_Stmt {
+  top.showMaxLenTransform <- \ _ -> mkIntConst(2);
+  top.showTransform := \ e::Expr -> [ableC_Stmt {
     buf[bufIndex++] = '{';
-    $Stmt{dcls.showTransform(e)};
+    $Stmt{foldShowItems(dcls.showTransform(e))};
     buf[bufIndex++] = '}';
-  };
+  }];
 }
 
 aspect production unionDecl
@@ -553,15 +599,17 @@ top::UnionDecl ::= attrs::Attributes  name::MaybeName  dcls::StructItemList
       static size_t $name{top.showFnName}(char *, union $name{n});
       static size_t $name{top.showFnName}(char *buf, union $name{n} val) {
         size_t bufIndex = 0;
-        $Stmt{top.showTransform(ableC_Expr { val })}
+        $Stmt{foldShowItems(top.showTransform(ableC_Expr { val }))}
+        buf[bufIndex] = '\0';
         return bufIndex;
       }
     };
-  top.showTransform := \ e::Expr -> ableC_Stmt {
+  top.showMaxLenTransform <- \ _ -> mkIntConst(2);
+  top.showTransform := \ e::Expr -> [ableC_Stmt {
     buf[bufIndex++] = '{';
-    $Stmt{dcls.showTransform(e)};
+    $Stmt{foldShowItems(dcls.showTransform(e))};
     buf[bufIndex++] = '}';
-  };
+  }];
 }
 
 aspect production structField
@@ -571,13 +619,16 @@ top::StructDeclarator ::= name::Name  ty::TypeModifierExpr  attrs::Attributes
   local checkExpr::Expr = errorExpr([]);
   top.showErrors := \ env::Env ->
     attachNote logicalLocationFromOrigin(top) on showErrors(env, top.typerep) end;
+  local fieldStrLen::Integer = length("." ++ name.name ++ " = ");
   top.showMaxLenTransform := \ e::Expr ->
-    getShowMaxLen(ableC_Expr { $Expr{e}.$Name{^name} }, top.env, top.typerep);
-  top.showTransform := \ e::Expr -> ableC_Stmt {
+    addExpr(
+      mkIntConst(fieldStrLen),
+      getShowMaxLen(ableC_Expr { $Expr{e}.$Name{^name} }, top.env, top.typerep));
+  top.showTransform := \ e::Expr -> [ableC_Stmt {
     strcpy(buf + bufIndex, $stringLiteralExpr{"." ++ name.name ++ " = "});
-    bufIndex += $intLiteralExpr{length("." ++ name.name ++ " = ")};
-    bufIndex += $Expr{getShow(ableC_Expr { buf }, ableC_Expr { $Expr{e}.$Name{^name} }, top.env, top.typerep)};
-  };
+    bufIndex += $intLiteralExpr{fieldStrLen};
+    bufIndex += $Expr{getShow(ableC_Expr { buf + bufIndex }, ableC_Expr { $Expr{e}.$Name{^name} }, top.env, top.typerep)};
+  }];
 }
 aspect production structBitfield
 top::StructDeclarator ::= name::MaybeName  ty::TypeModifierExpr  e::Expr  attrs::Attributes
@@ -586,19 +637,22 @@ top::StructDeclarator ::= name::MaybeName  ty::TypeModifierExpr  e::Expr  attrs:
   local checkExpr::Expr = errorExpr([]);
   top.showErrors := \ env::Env ->
     attachNote logicalLocationFromOrigin(top) on showErrors(env, top.typerep) end;
+  local fieldStrLen::Integer = length("." ++ name.maybename.fromJust.name ++ " = ");
   top.showMaxLenTransform := \ e::Expr ->
     case name.maybename of
-    | just(n) -> getShowMaxLen(ableC_Expr { $Expr{e}.$Name{n} }, top.env, top.typerep)
+    | just(n) -> addExpr(
+        mkIntConst(fieldStrLen),
+        getShowMaxLen(ableC_Expr { $Expr{e}.$Name{n} }, top.env, top.typerep))
     | nothing() -> mkIntConst(0)
     end;
   top.showTransform := \ e::Expr ->
     case name.maybename of
-    | just(n) -> ableC_Stmt {
+    | just(n) -> [ableC_Stmt {
         strcpy(buf + bufIndex, $stringLiteralExpr{"." ++ n.name ++ " = "});
-        bufIndex += $intLiteralExpr{length("." ++ n.name ++ " = ")};
-        bufIndex += $Expr{getShow(ableC_Expr { buf }, ableC_Expr { $Expr{e}.$Name{n} }, top.env, top.typerep)};
-      }
-    | nothing() -> nullStmt()
+        bufIndex += $intLiteralExpr{fieldStrLen};
+        bufIndex += $Expr{getShow(ableC_Expr { buf + bufIndex }, ableC_Expr { $Expr{e}.$Name{n} }, top.env, top.typerep)};
+      }]
+    | nothing() -> []
     end;
 }
 aspect production warnStructField
@@ -610,9 +664,7 @@ top::StructDeclarator ::= msg::[Message]
 production assignString implements AssignOp
 top::Expr ::= @lhs::Expr @rhs::Expr
 {
-  top.pp = pp"${lhs.pp} = ${rhs.pp}";
-  
-  forwards to eqExpr(@lhs, strExpr(@rhs));
+  forwards to bindAssignOp(lhs, rhs, \ tmpLhs tmpRhs -> directEqExpr(tmpLhs, strExpr(tmpRhs)));
 }
 
 production concatString implements BinaryOp
@@ -629,16 +681,19 @@ top::Expr ::= @e1::Expr @e2::Expr
     attachNote logicalLocationFromOrigin(e2) on
       e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.env)
     end ++
-    checkStringHeaderDef("concat_string", top.env) ++
     case top.env.allocContext of
     | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
     | _ -> []
     end;
 
-  forward fwrd =
-    directCallExpr(
-      name("concat_string"),
-      consExpr(strExpr(@e1), consExpr(strExpr(@e2), nilExpr())));
+  top.typerep = extType(nilQualifier(), stringType());
+  top.buildStr = \ buf::Name len::Name ->
+    let buildE1::(Stmt, Expr, Stmt) = e1.buildStr(buf, len),
+        buildE2::(Stmt, Expr, Stmt) = e2.buildStr(buf, len)
+    in (seqStmt(buildE1.1, buildE2.1), addExpr(buildE1.2, buildE2.2), seqStmt(buildE1.3, buildE2.3))
+    end;
+
+  forward fwrd = transformBinaryOp(e1, e2, wrapBuildStr(top.buildStr));
   forwards to
     if null(localErrors) then @fwrd else errorExpr(localErrors);
 }
@@ -652,7 +707,6 @@ top::Expr ::= @e1::Expr @e2::Expr
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
-    checkStringHeaderDef("repeat_string", top.env) ++
     case top.env.allocContext of
     | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
     | _ -> []
@@ -662,10 +716,28 @@ top::Expr ::= @e1::Expr @e2::Expr
     then []
     else [errFromOrigin(e2, s"string repeat must have integer type, but got ${show(80, e2.typerep)}")];
 
-  forward fwrd =
-    directCallExpr(
-      name("repeat_string"),
-      consExpr(strExpr(@e1), consExpr(strExpr(@e2), nilExpr())));
+  top.typerep = extType(nilQualifier(), stringType());
+
+  nondecorated local countName::Name = freshName("count");
+  nondecorated local iName::Name = freshName("i");
+  top.buildStr = \ buf::Name len::Name ->
+    let buildE1::(Stmt, Expr, Stmt) = e1.buildStr(buf, len)
+    in (
+      ableC_Stmt {
+        proto_typedef size_t;
+        $Stmt{buildE1.1}
+        size_t $Name{countName} = $Expr{^e2};
+      },
+      mulExpr(buildE1.2, declRefExpr(countName)),
+      ableC_Stmt {
+        proto_typedef size_t;
+        for (size_t $Name{iName} = 0; $Name{iName} < $Name{countName}; $Name{iName}++) {
+          $Stmt{buildE1.3}
+        }
+      })
+    end;
+
+  forward fwrd = transformBinaryOp(e1, e2, wrapBuildStr(top.buildStr));
   forwards to
     if null(localErrors) then @fwrd else errorExpr(localErrors);
 }
@@ -684,17 +756,17 @@ top::Expr ::= @e1::Expr @e2::Expr
     attachNote logicalLocationFromOrigin(e2) on
       e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.env)
     end ++
-    checkStringHeaderDef("equals_string", top.env) ++
+    checkStringHeaderDef(top.env) ++
     case top.env.allocContext of
     | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
     | _ -> []
     end;
-  
-  local fwrd::Expr =
-    directCallExpr(
-      name("equals_string"),
-      consExpr(strExpr(@e1), consExpr(strExpr(@e2), nilExpr())));
-  forwards to mkErrorCheck(localErrors, @fwrd);
+
+  forward fwrd = bindBinaryOp(e1, e2, \ tmpE1 tmpE2 ->
+    directCallExpr(name("equals_string"),
+      consExpr(strExpr(tmpE1), consExpr(strExpr(tmpE2), nilExpr()))));
+  forwards to
+    if null(localErrors) then @fwrd else errorExpr(localErrors);
 }
 
 production subscriptString implements BinaryOp
@@ -706,7 +778,7 @@ top::Expr ::= @e1::Expr @e2::Expr
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
-    checkStringHeaderDef("subscript_string", top.env) ++
+    checkStringHeaderDef(top.env) ++
     case top.env.allocContext of
     | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
     | _ -> []
@@ -715,12 +787,10 @@ top::Expr ::= @e1::Expr @e2::Expr
     if e2.typerep.isIntegerType
     then []
     else [errFromOrigin(e2, s"string index must have integer type, but got ${show(80, e2.typerep)}")];
-  
-  local fwrd::Expr =
-    directCallExpr(
-      name("subscript_string"),
-      consExpr(strExpr(@e1), consExpr(strExpr(@e2), nilExpr())));
-  forwards to mkErrorCheck(localErrors, @fwrd);
+
+  forward fwrd = callBinaryOp(e1, e2, name("subscript_string"), nilExpr());
+  forwards to
+    if null(localErrors) then @fwrd else errorExpr(localErrors);
 }
 
 production callMemberString
@@ -733,28 +803,6 @@ top::Expr ::= lhs::Expr deref::Boolean rhs::Name a::Exprs
     end;
 }
 
-production memberString implements MemberAccess
-top::Expr ::= @lhs::Expr deref::Boolean rhs::Name
-{
-  top.pp = parens(ppConcat([lhs.pp, text(if deref then "->" else "."), rhs.pp]));
-  attachNote extensionGenerated("ableC-string");
-  propagate env, controlStmtContext;
-
-  local localErrors::[Message] =
-    (if !null(lookupRefId("edu:umn:cs:melt:exts:ableC:string:string", top.env))
-     then []
-     else [errFromOrigin(top, "Missing include of string.xh")]) ++
-    checkStringType(lhs.typerep, ".") ++
-    (if rhs.name == "length" || rhs.name == "text"
-     then []
-     else [errFromOrigin(rhs, s"string does not have member ${rhs.name}")]);
-  local fwrd::Expr =
-    ableC_Expr {
-      ((const struct _string_s)$Expr{@lhs}).$Name{@rhs}
-    };
-  forwards to mkErrorCheck(localErrors, @fwrd);
-}
-
 production substringString
 top::Expr ::= e1::Expr a::Exprs
 {
@@ -763,7 +811,7 @@ top::Expr ::= e1::Expr a::Exprs
 
   local localErrors::[Message] =
     e1.errors ++ a.errors ++
-    checkStringHeaderDef("substring", top.env) ++
+    checkStringHeaderDef(top.env) ++
     case top.env.allocContext of
     | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
     | _ -> []
@@ -778,15 +826,16 @@ top::Expr ::= e1::Expr a::Exprs
     if null(localErrors) then @fwrd else errorExpr(localErrors);
 }
 
-production initString
-top::Initializer ::= e::Expr
+production initString implements ExprInitializer
+top::Initializer ::= @e::Expr
 {
-  forwards to exprInitializer(strExpr(@e));
+  -- TODO: should be able to be shared?
+  forwards to transformExprInitializer(e, strExpr(^e));
 }
 
 -- Check the given env for the given function name
-fun checkStringHeaderDef [Message] ::= n::String env::Env =
-  if !null(lookupValue(n, env))
+fun checkStringHeaderDef [Message] ::= env::Env =
+  if !null(lookupValue("MAX_POINTER_STR_LEN", env))
   then []
   else [errFromOrigin(ambientOrigin(), "Missing include of string.xh")];
 

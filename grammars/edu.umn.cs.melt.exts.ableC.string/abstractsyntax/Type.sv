@@ -24,21 +24,19 @@ top::ExtType ::=
   top.mangledName = "string";
   top.isEqualTo =
     \ other::ExtType -> case other of stringType() -> true | _ -> false end;
-  
+  top.maybeRefId := just("edu:umn:cs:melt:exts:ableC:string:string");  -- Permit member accesses
+
   top.eqProd = just(assignString);
   top.lAddProd = just(concatString);
   top.rAddProd = just(concatString);
   top.lMulProd = just(repeatString);
-  -- TODO: Overloads for +=, *=, automatically inferred from above
   top.lEqualsProd = just(equalsString);
   top.rEqualsProd = just(equalsString);
-  -- TODO: Overload for != automatically inferred from above
   top.arraySubscriptProd = just(subscriptString);
   -- Better error message than default one about not being an lvalue
   top.addressOfArraySubscriptProd =
     just(\ Expr Expr -> errorExpr([errFromOrigin(ambientOrigin(), "strings are immutable, cannot assign to index")]));
   top.callMemberProd = just(callMemberString);
-  top.memberProd = just(memberString);
   top.exprInitProd = just(initString);
 }
 
@@ -49,8 +47,14 @@ monoid attribute strErrors::([Message] ::= Env) with \ _ -> [], joinShowErrors o
 fun joinShowErrors ([Message] ::= Env) ::= e1::([Message] ::= Env) e2::([Message] ::= Env) =
   \ env::Env -> e1(env) ++ e2(env);
 
--- Coerce a value of some type to a string.
-synthesized attribute strProd::(Expr ::= Expr) occurs on Type, BuiltinType, ExtType;
+-- Directly coerce a value of some type to a string.
+synthesized attribute directStrProd::(Expr ::= Expr) occurs on Type, BuiltinType, ExtType;
+
+-- Compute the maximum length of the string coerced from a value.
+synthesized attribute strMaxLenProd::(Expr ::= Expr) occurs on Type, BuiltinType, ExtType;
+
+-- Write a string coerced from a value to a buffer, returning the string length.
+synthesized attribute strProd::(Expr ::= Expr Expr) occurs on Type, BuiltinType, ExtType;
 
 -- Compute the maximum length of the string for a value of some type.
 synthesized attribute showMaxLenProd::(Expr ::= Expr) occurs on Type, BuiltinType, ExtType;
@@ -67,6 +71,8 @@ top::Type ::=
   top.strErrors :=
     \ env::Env ->
       [errFromOrigin(ambientOrigin(), s"str is not defined for type ${show(80, ^top)}")];
+  top.directStrProd = directStrExpr(_, top.strMaxLenProd, top.strProd);
+  top.strMaxLenProd = error("Undefined");
   top.strProd = error("Undefined");
   top.showMaxLenProd = error("Undefined");
   top.showProd = error("Undefined");
@@ -76,7 +82,6 @@ aspect production errorType
 top::Type ::= 
 {
   propagate showErrors, strErrors;
-  top.strProd = \ _ -> errorExpr([]);
   top.showMaxLenProd = \ _ -> errorExpr([]);
   top.showProd = \ _ _ -> errorExpr([]);
 }
@@ -86,7 +91,7 @@ top::Type ::= quals::Qualifiers sub::Type
 {
   top.showErrors :=
     \ env::Env ->
-      checkStringHeaderDef("show_char_pointer", env) ++
+      checkStringHeaderDef(env) ++
       case sub of
       | builtinType(_, voidType()) -> []
       | functionType(_, _, _) -> []
@@ -94,7 +99,19 @@ top::Type ::= quals::Qualifiers sub::Type
       end;
   top.strErrors :=
     \ env::Env ->
-      checkStringHeaderDef("MAX_POINTER_STR_LEN", env) ++ sub.strErrors(env);
+      checkStringHeaderDef(env) ++ sub.strErrors(env);
+  top.directStrProd =
+    case sub of
+    | builtinType(_, signedType(charType())) -> directStrCharPointer
+    | builtinType(_, unsignedType(charType())) -> directStrCharPointer
+    | _ -> directStrExpr(_, top.strMaxLenProd, top.strProd)
+    end;
+  top.strMaxLenProd =
+    case sub of
+    | builtinType(_, signedType(charType())) -> strCharPointerMaxLen
+    | builtinType(_, unsignedType(charType())) -> strCharPointerMaxLen
+    | _ -> \ _ -> ableC_Expr { MAX_POINTER_STR_LEN }
+    end;
   top.strProd =
     case sub of
     | builtinType(_, signedType(charType())) -> strCharPointer
@@ -107,7 +124,7 @@ top::Type ::= quals::Qualifiers sub::Type
     | builtinType(_, unsignedType(charType())) -> showCharPointerMaxLen
     | builtinType(_, voidType()) -> showOpaquePointerMaxLen
     | functionType(_, _, _) -> showOpaquePointerMaxLen
-    | _ -> showCharPointerMaxLen
+    | _ -> showPointerMaxLen
     end;
   top.showProd =
     case sub of
@@ -123,9 +140,11 @@ aspect production builtinType
 top::Type ::= quals::Qualifiers sub::BuiltinType
 {
   propagate showErrors, strErrors;
+  top.directStrProd = sub.directStrProd;
+  top.strMaxLenProd = sub.strMaxLenProd;
+  top.strProd = sub.strProd;
   top.showMaxLenProd = sub.showMaxLenProd;
   top.showProd = sub.showProd;
-  top.strProd = sub.strProd;
 }
 
 aspect default production
@@ -137,6 +156,8 @@ top::BuiltinType ::=
   top.strErrors :=
     \ env::Env ->
       [errFromOrigin(ambientOrigin(), s"str is not defined for type ${show(80, builtinType(nilQualifier(), top))}")];
+  top.directStrProd = directStrExpr(_, top.strMaxLenProd, top.strProd);
+  top.strMaxLenProd = error("Undefined");
   top.strProd = error("Undefined");
   top.showMaxLenProd = error("Undefined");
   top.showProd = error("Undefined");
@@ -145,33 +166,45 @@ top::BuiltinType ::=
 aspect production boolType
 top::BuiltinType ::=
 {
-  top.showErrors := checkStringHeaderDef("TRUE_STR", _);
-  top.strErrors := checkStringHeaderDef("show_bool", _);
+  top.showErrors := checkStringHeaderDef;
+  top.strErrors := checkStringHeaderDef;
+  top.directStrProd = directStrBool;
+  top.strMaxLenProd = \ _ -> mkIntConst(5);
   top.strProd = strBool;
-  top.showMaxLenProd = \ _ -> mkIntConst(5);
-  top.showProd = showBool;
+  top.showMaxLenProd = top.strMaxLenProd;
+  top.showProd = top.strProd;
 }
 
 aspect production realType
 top::BuiltinType ::= sub::RealType
 {
-  top.showErrors := checkStringHeaderDef("show_float", _);
-  top.strErrors := checkStringHeaderDef("MAX_FLOAT_STR_LEN", _);
-  top.strProd = strNum(_, sub.maxStrWidth, s"%${sub.formatSizeChars}f");
-  top.showMaxLenProd = \ _ -> sub.maxStrWidth;
-  top.showProd = showNum(_, _, s"%${sub.formatSizeChars}f");
+  top.showErrors := checkStringHeaderDef;
+  top.strErrors := checkStringHeaderDef;
+  top.strMaxLenProd = \ _ -> sub.maxStrWidth;
+  top.strProd = strNum(_, _, s"%${sub.formatSizeChars}g");
+  top.showMaxLenProd = top.strMaxLenProd;
+  top.showProd = top.strProd;
 }
 
 aspect production signedType
 top::BuiltinType ::= sub::IntegerType
 {
-  top.showErrors := checkStringHeaderDef("show_int", _);
-  top.strErrors := checkStringHeaderDef("MAX_INT_STR_LEN", _);
-  top.strProd = strNum(_, sub.maxStrWidth, s"%${sub.formatSizeChars}d");
-  top.showMaxLenProd = \ _ ->
+  top.showErrors := checkStringHeaderDef;
+  top.strErrors := checkStringHeaderDef;
+  top.strMaxLenProd = \ _ ->
     case sub of
-    | charType() -> mkIntConst(5)
+    | charType() -> mkIntConst(1)
     | _ -> sub.maxStrWidth
+    end;
+  top.strProd = 
+    case sub of
+    | charType() -> strChar
+    | _ -> strNum(_, _, s"%${sub.formatSizeChars}d")
+    end;
+  top.showMaxLenProd =
+    case sub of
+    | charType() -> \ _ -> mkIntConst(5)
+    | _ -> top.strMaxLenProd
     end;
   top.showProd =
     case sub of
@@ -180,20 +213,29 @@ top::BuiltinType ::= sub::IntegerType
         directCallExpr(
           name("show_char"),
           consExpr(buf, consExpr(e, nilExpr())))
-    | _ -> showNum(_, _, s"%${sub.formatSizeChars}d")
+    | _ -> top.strProd
     end;
 }
 
 aspect production unsignedType
 top::BuiltinType ::= sub::IntegerType
 {
-  top.showErrors := checkStringHeaderDef("show_int", _);
-  top.strErrors := checkStringHeaderDef("MAX_INT_STR_LEN", _);
-  top.strProd = strNum(_, sub.maxStrWidth, s"%${sub.formatSizeChars}u");
-  top.showMaxLenProd = \ _ ->
+  top.showErrors := checkStringHeaderDef;
+  top.strErrors := checkStringHeaderDef;
+  top.strMaxLenProd = \ _ ->
     case sub of
-    | charType() -> mkIntConst(5)
+    | charType() -> mkIntConst(1)
     | _ -> sub.maxStrWidth
+    end;
+  top.strProd = 
+    case sub of
+    | charType() -> strChar
+    | _ -> strNum(_, _, s"%${sub.formatSizeChars}u")
+    end;
+  top.showMaxLenProd =
+    case sub of
+    | charType() -> \ _ -> mkIntConst(5)
+    | _ -> top.strMaxLenProd
     end;
   top.showProd =
     case sub of
@@ -202,7 +244,7 @@ top::BuiltinType ::= sub::IntegerType
         directCallExpr(
           name("show_char"),
           consExpr(buf, consExpr(e, nilExpr())))
-    | _ -> showNum(_, _, s"%${sub.formatSizeChars}u")
+    | _ -> top.strProd
     end;
 }
 
@@ -276,9 +318,11 @@ aspect production extType
 top::Type ::= quals::Qualifiers sub::ExtType
 {
   propagate showErrors, strErrors;
+  top.directStrProd = sub.directStrProd;
+  top.strMaxLenProd = sub.strMaxLenProd;
+  top.strProd = sub.strProd;
   top.showMaxLenProd = sub.showMaxLenProd;
   top.showProd = sub.showProd;
-  top.strProd = sub.strProd;
 }
 
 aspect default production
@@ -290,16 +334,21 @@ top::ExtType ::=
   top.strErrors :=
     \ env::Env->
       [errFromOrigin(ambientOrigin(), s"str is not defined for type ${show(80, extType(nilQualifier(), ^top))}")];
+  top.directStrProd = directStrExpr(_, top.strMaxLenProd, top.strProd);
+  top.strMaxLenProd = error("Undefined");
+  top.strProd = error("Undefined");
   top.showMaxLenProd = error("Undefined");
   top.showProd = error("Undefined");
-  top.strProd = error("Undefined");
 }
 
 aspect production stringType
 top::ExtType ::=
 {
-  top.showErrors := checkStringHeaderDef("show_string", _);
+  top.showErrors := checkStringHeaderDef;
   top.strErrors := \ _ -> [];
+  top.directStrProd = id;
+  top.strMaxLenProd = strStringMaxLen;
+  top.strProd = strString;
   top.showMaxLenProd =
     \ e::Expr ->
       directCallExpr(
@@ -310,7 +359,6 @@ top::ExtType ::=
       directCallExpr(
         name("show_string"),
         consExpr(buf, consExpr(e, nilExpr())));
-  top.strProd = id;
 }
 
 aspect production refIdExtType
@@ -319,7 +367,7 @@ top::ExtType ::= kwd::StructOrEnumOrUnion  mn::Maybe<String>  refId::String
   local topType::Type = extType(top.givenQualifiers, ^top);
   top.showErrors :=
     \ env::Env ->
-      checkStringHeaderDef("concat_string", env) ++
+      checkStringHeaderDef(env) ++
       case kwd, lookupRefId(refId, globalEnv(env)) of
       | structSEU(), structRefIdItem(decl) :: _ -> decl.showDeclErrors(env)
       | unionSEU(), unionRefIdItem(decl) :: _ -> decl.showDeclErrors(env)
@@ -327,6 +375,12 @@ top::ExtType ::= kwd::StructOrEnumOrUnion  mn::Maybe<String>  refId::String
       | unionSEU(), _ -> [errFromOrigin(ambientOrigin(), s"union ${tagName} does not have a (global) definition.")]
       | _, _ -> error("Unexpected refIdExtType")
       end;
+  top.showMaxLenProd =
+    case kwd of
+    | structSEU() -> showStructMaxLen
+    | unionSEU() -> showUnionMaxLen
+    | _ -> error("refIdExtType not a struct or union")
+    end;
   top.showProd =
     case kwd of
     | structSEU() -> showStruct
@@ -338,9 +392,11 @@ top::ExtType ::= kwd::StructOrEnumOrUnion  mn::Maybe<String>  refId::String
 aspect production enumExtType
 top::ExtType ::= ref::Decorated EnumDecl
 {
-  top.showErrors := checkStringHeaderDef("show_char_pointer", _);
-  top.strErrors := checkStringHeaderDef("show_int", _);
+  top.showErrors := checkStringHeaderDef;
+  top.strErrors := checkStringHeaderDef;
+  top.directStrProd = ref.directStrProd;
+  top.strMaxLenProd = \ _ -> mkIntConst(ref.maxEnumItemLen);
+  top.strProd = \ buf::Expr e::Expr -> ableC_Expr { sprintf($Expr{buf}, "%s", ref.directStrProd(e)) };
   top.showMaxLenProd = \ _ -> mkIntConst(ref.maxEnumItemLen);
   top.showProd = ref.showProd;
-  top.strProd = ref.strProd;
 }
