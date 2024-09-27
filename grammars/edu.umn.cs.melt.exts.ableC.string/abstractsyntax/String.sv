@@ -805,6 +805,7 @@ top::Expr ::= @lhs::Expr deref::Boolean rhs::Name @a::Exprs
   forwards to bindMemberCall(lhs, deref, @rhs, a, \ e args ->
     case rhs.name, args of
     | "substring", [i1, i2] -> substringString(e, i1, i2)
+    | "copy", [] -> copyString(e)
     | n, _ -> errorExpr([errFromOrigin(rhs, s"string does not have method ${n} with ${toString(a.count)} arguments")])
     end);
 }
@@ -838,8 +839,34 @@ top::Expr ::= s::Expr i1::Expr i2::Expr
       memcpy($Name{bufName}, $Expr{^s}.text + $Expr{^i1}, $Name{lenName});
       $Name{bufName}[$Name{lenName}] = '\0';
       ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){
-        $Expr{mkIntConst(0)}, $Name{bufName}
+        $Name{lenName}, $Name{bufName}
       };})
+  };
+  forwards to
+    if null(localErrors) then @fwrd else errorExpr(localErrors);
+}
+
+
+production copyString
+top::Expr ::= s::Expr
+{
+  top.pp = pp"${s}.copy()";
+  attachNote extensionGenerated("ableC-string");
+
+  local localErrors::[Message] =
+    s.errors ++
+    checkStringHeaderDef(top.env) ++
+    case top.env.allocContext of
+    | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
+    | _ -> []
+    end ++
+    checkStringType(s.typerep, "copy");
+
+  nondecorated local bufName::Name = freshName("buf");
+  forward fwrd = ableC_Expr {
+    ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){
+      $Expr{@s}.length, memcpy(allocate($Expr{^s}.length + 1), $Expr{^s}.text, $Expr{^s}.length + 1)
+    }
   };
   forwards to
     if null(localErrors) then @fwrd else errorExpr(localErrors);

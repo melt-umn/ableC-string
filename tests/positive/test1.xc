@@ -191,5 +191,10 @@ int main(int argc, char **argv) {
   string e1 = show(main);
   printf("e1: %s\n", e1.text);
 
+  string f1 = a.copy();
+  printf("f1: %s\n", f1.text);
+  if (f1 != "abc")
+    return 28;
+
   return 0;
 }
