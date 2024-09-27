@@ -7,6 +7,8 @@ enum foo {
   A, B, C
 };
 
+allocate_using heap;
+
 int main(int argc, char **argv) {
   string a;
   a = "abc";

@@ -4,21 +4,33 @@
 
 typedef struct foo { int x; } *foo;
 
-string struct_foo_to_string(struct foo x) {
-  return str("struct foo: ") + show(x.x);
+size_t struct_foo_max_len(struct foo ignored) {
+  return 20;
 }
 
-string foo_to_string(foo x) {
-  return str("pointer to struct foo: ") + show(x->x);
+size_t struct_foo_to_string(char *buf, struct foo x) {
+  return sprintf(buf, "struct foo: %d", x.x);
 }
 
-show foo with foo_to_string;
-show struct foo with struct_foo_to_string;
+size_t foo_max_len(foo ignored) {
+  return 30;
+}
+
+size_t foo_to_string(char *buf, foo x) {
+  return sprintf(buf, "pointer to struct foo: %d", x->x);
+}
+
+show foo with foo_max_len, foo_to_string;
+show struct foo with struct_foo_max_len, struct_foo_to_string;
+
+allocate_using heap;
 
 int main(int argc, char **argv) {
   foo x = malloc(sizeof(struct foo));
   x->x = 42;
-  assert(show(x) == "pointer to struct foo: 42");
-  assert(show(*x) == "struct foo: 42");
+  if (show(x) != "pointer to struct foo: 42")
+    return 1;
+  if (show(*x) != "struct foo: 42")
+    return 2;
   return 0;
 }

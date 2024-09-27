@@ -4,15 +4,21 @@
 
 typedef struct foo *foo;
 
-string foo_to_string(foo ignored) {
-  (void)ignored;
-  return str("Foo!");
+size_t foo_max_len(foo ignored) {
+  return 4;
 }
 
-show (foo) with foo_to_string;
+size_t foo_to_string(char *buf, foo ignored) {
+  return sprintf(buf, "Foo!");
+}
+
+show foo with foo_max_len, foo_to_string;
+
+allocate_using heap;
 
 int main(int argc, char **argv) {
   foo x = NULL;
-  assert(show(x) == "Foo!");
+  if (show(x) != "Foo!")
+    return 1;
   return 0;
 }

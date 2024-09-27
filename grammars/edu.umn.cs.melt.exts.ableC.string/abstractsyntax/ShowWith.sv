@@ -18,7 +18,7 @@ top::Decl ::= ty::TypeName  sizeFunc::Name func::Name
   nondecorated local expectedSizeFnType::Type =
     functionType(sizeType, protoFunctionType([ty.typerep], false), nilQualifier());
   nondecorated local expectedFnType::Type =
-    functionType(sizeType, protoFunctionType([pointerType(nilQualifier(), builtinType(nilQualifier(), unsignedType(charType()))), ty.typerep], false), nilQualifier());
+    functionType(sizeType, protoFunctionType([pointerType(nilQualifier(), builtinType(nilQualifier(), signedType(charType()))), ty.typerep], false), nilQualifier());
   local localErrors::[Message] = type.errors ++ func.valueLookupCheck ++
     case getCustomShow(type, top.env) of
     | just(_) -> [errFromOrigin(func, show(80, pp"show for ${ty.pp} already defined"))]

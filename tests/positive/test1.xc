@@ -33,6 +33,9 @@ int main(int argc, char **argv) {
 
   if (a == "abcd")
     return 2;
+  
+  if (a[2] != 'c')
+    return 2;
 
   string b = str("def");
   printf("b: %s\n", b.text);
@@ -85,10 +88,10 @@ int main(int argc, char **argv) {
   if (i.length != 7)
     return 10;
 
-  // string j = i.substring(3, 6);
-  // printf("j: %s\n", j.text);
-  // if (j != "415")
-  //   return 11;
+  string j = i.substring(3, 6);
+  printf("j: %s\n", j.text);
+  if (j != "415")
+    return 11;
 
   string k = str("abcd");
   printf("k: %s\n", k.text);

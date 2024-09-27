@@ -24,7 +24,6 @@ top::ExtType ::=
   top.mangledName = "string";
   top.isEqualTo =
     \ other::ExtType -> case other of stringType() -> true | _ -> false end;
-  top.maybeRefId := just("edu:umn:cs:melt:exts:ableC:string:string");  -- Permit member accesses
 
   top.eqProd = just(assignString);
   top.lAddProd = just(concatString);
@@ -36,7 +35,8 @@ top::ExtType ::=
   -- Better error message than default one about not being an lvalue
   top.addressOfArraySubscriptProd =
     just(\ Expr Expr -> errorExpr([errFromOrigin(ambientOrigin(), "strings are immutable, cannot assign to index")]));
-  top.callMemberProd = just(callMemberString);
+  top.memberProd = just(memberString);
+  top.memberCallProd = just(memberCallString);
   top.exprInitProd = just(initString);
 }
 
@@ -82,6 +82,9 @@ aspect production errorType
 top::Type ::= 
 {
   propagate showErrors, strErrors;
+  top.directStrProd = \ _ -> errorExpr([]);
+  top.strMaxLenProd = \ _ -> errorExpr([]);
+  top.strProd = \ _ _ -> errorExpr([]);
   top.showMaxLenProd = \ _ -> errorExpr([]);
   top.showProd = \ _ _ -> errorExpr([]);
 }

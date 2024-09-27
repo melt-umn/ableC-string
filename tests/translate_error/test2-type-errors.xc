@@ -9,6 +9,8 @@ struct foo {
   t *a;
 };
 
+allocate_using heap;
+
 int main(int argc, char **argv) {
   string a = str((t){4}); // str of a type without str defined
 

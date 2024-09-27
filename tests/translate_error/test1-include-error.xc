@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+allocate_using heap;
+
 int main(int argc, char **argv) {
   string a = str("abc");
   printf("a: %s\n", a.text);

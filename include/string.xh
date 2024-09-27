@@ -30,15 +30,12 @@ static const struct _string_s FALSE_STR = {5, "false"};
 
 // Functions prefixed with _ are considered internal to the implementation of the extension
 // Other functions are in theory OK to call directly
-static inline void _check_index_string(string s, size_t i) {
+
+static inline char subscript_string(string s, size_t i) {
   if (i < 0 || i >= s.length) {
     fprintf(stderr, "String index out of bounds: length %lu, index %lu\n", s.length, i);
     abort();
   }
-}
-
-static inline char subscript_string(string s, size_t i) {
-  _check_index_string(s, i);
   return s.text[i];
 }
 
@@ -46,15 +43,12 @@ static inline _Bool equals_string(string s1, string s2) {
   return s1.length == s2.length && !strcmp(s1.text, s2.text);
 }
 
-// static inline string substring(string s, size_t start, size_t end) {
-//   if (start < 0 || start >= s.length || end < 0 || end >= s.length || start > end) {
-//     fprintf(stderr, "Substring index out of bounds: length %lu, start %lu, end %lu\n", s.length, start, end);
-//     abort();
-//   }
-//   char *result = GC_malloc(end - start + 1);
-//   strncpy(result, s.text + start, end - start);
-//   return (string)(struct _string_s){end - start, result};
-// }
+static inline void _check_string_bounds(string s, size_t start, size_t end) {
+  if (start < 0 || start >= s.length || end < 0 || end >= s.length || start > end) {
+    fprintf(stderr, "Substring index out of bounds: length %lu, start %lu, end %lu\n", s.length, start, end);
+    abort();
+  }
+}
 
 static inline size_t escape_char(char *buf, char c) {
   size_t bufIndex = 0;

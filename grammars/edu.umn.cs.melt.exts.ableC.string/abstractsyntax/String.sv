@@ -422,7 +422,7 @@ top::Expr ::= e::Expr
 {
   attachNote extensionGenerated("ableC-string");
   top.pp = pp"showStructMaxLen(${e})";
-  propagate env;
+  propagate env, controlStmtContext;
 
   local decl::Decorated StructDecl =
     case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
@@ -441,7 +441,7 @@ top::Expr ::= buf::Expr e::Expr
 {
   attachNote extensionGenerated("ableC-string");
   top.pp = pp"showStruct(${buf}, ${e})";
-  propagate env;
+  propagate env, controlStmtContext;
 
   local decl::Decorated StructDecl =
     case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
@@ -460,7 +460,7 @@ top::Expr ::= e::Expr
 {
   attachNote extensionGenerated("ableC-string");
   top.pp = pp"showUnionMaxLen(${e})";
-  propagate env;
+  propagate env, controlStmtContext;
   
   local decl::Decorated UnionDecl =
     case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
@@ -479,7 +479,7 @@ top::Expr ::= buf::Expr e::Expr
 {
   attachNote extensionGenerated("ableC-string");
   top.pp = pp"showUnion(${buf}, ${e})";
-  propagate env;
+  propagate env, controlStmtContext;
   
   local decl::Decorated UnionDecl =
     case lookupRefId(e.typerep.maybeRefId.fromJust, top.env) of
@@ -664,7 +664,7 @@ top::StructDeclarator ::= msg::[Message]
 production assignString implements AssignOp
 top::Expr ::= @lhs::Expr @rhs::Expr
 {
-  forwards to bindAssignOp(lhs, rhs, \ tmpLhs tmpRhs -> directEqExpr(tmpLhs, strExpr(tmpRhs)));
+  forwards to bindAssignOp(lhs, rhs, \ tmpLhs tmpRhs -> hostEqExpr(tmpLhs, strExpr(tmpRhs)));
 }
 
 production concatString implements BinaryOp
@@ -703,7 +703,6 @@ top::Expr ::= @e1::Expr @e2::Expr
 {
   top.pp = pp"${e1.pp} * ${e2.pp}";
   attachNote extensionGenerated("ableC-string");
-  propagate controlStmtContext;
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
@@ -779,10 +778,6 @@ top::Expr ::= @e1::Expr @e2::Expr
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
     checkStringHeaderDef(top.env) ++
-    case top.env.allocContext of
-    | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
-    | _ -> []
-    end ++
     checkStringType(e1.typerep, "[]") ++
     if e2.typerep.isIntegerType
     then []
@@ -793,35 +788,59 @@ top::Expr ::= @e1::Expr @e2::Expr
     if null(localErrors) then @fwrd else errorExpr(localErrors);
 }
 
-production callMemberString
-top::Expr ::= lhs::Expr deref::Boolean rhs::Name a::Exprs
+production memberString implements MemberAccess
+top::Expr ::= @lhs::Expr deref::Boolean rhs::Name
 {
-  forwards to
+  forwards to bindMemberAccess(lhs, deref, @rhs, \ e ->
     case rhs.name of
-    | "substring" -> substringString(@lhs, @a)
+    | "length" -> ableC_Expr { ((struct _string_s)$Expr{e}).length }
+    | "text"   -> ableC_Expr { ((struct _string_s)$Expr{e}).text }
     | n -> errorExpr([errFromOrigin(rhs, s"string does not have field ${n}")])
-    end;
+    end);
+}
+
+production memberCallString implements MemberCall
+top::Expr ::= @lhs::Expr deref::Boolean rhs::Name @a::Exprs
+{
+  forwards to bindMemberCall(lhs, deref, @rhs, a, \ e args ->
+    case rhs.name, args of
+    | "substring", [i1, i2] -> substringString(e, i1, i2)
+    | n, _ -> errorExpr([errFromOrigin(rhs, s"string does not have method ${n} with ${toString(a.count)} arguments")])
+    end);
 }
 
 production substringString
-top::Expr ::= e1::Expr a::Exprs
+top::Expr ::= s::Expr i1::Expr i2::Expr
 {
-  top.pp = pp"${e1.pp}.substring(${ppImplode(pp", ", a.pps)}";
+  top.pp = pp"${s}.substring(${i1}, ${i2})";
   attachNote extensionGenerated("ableC-string");
 
   local localErrors::[Message] =
-    e1.errors ++ a.errors ++
+    s.errors ++ i1.errors ++ i2.errors ++
     checkStringHeaderDef(top.env) ++
     case top.env.allocContext of
     | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
     | _ -> []
     end ++
-    checkStringType(e1.typerep, "substring") ++
-    a.argumentErrors;
-  forward fwrd =
-    directCallExpr(
-      name("substring"),
-      consExpr(@e1, @a));
+    checkStringType(s.typerep, "substring") ++
+    (if i1.typerep.isIntegerType then []
+     else [errFromOrigin(i1, "substring indices must have integer type")]) ++
+    (if i2.typerep.isIntegerType then []
+     else [errFromOrigin(i2, "substring indices must have integer type")]);
+
+  nondecorated local bufName::Name = freshName("buf");
+  nondecorated local lenName::Name = freshName("len");
+  forward fwrd = ableC_Expr {
+    proto_typedef size_t;
+    ({_check_string_bounds($Expr{@s}, $Expr{@i1}, $Expr{@i2});
+      size_t $Name{lenName} = $Expr{^i2} - $Expr{^i1};
+      char *$Name{bufName} = allocate($Name{lenName} + 1);
+      memcpy($Name{bufName}, $Expr{^s}.text + $Expr{^i1}, $Name{lenName});
+      $Name{bufName}[$Name{lenName}] = '\0';
+      ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){
+        $Expr{mkIntConst(0)}, $Name{bufName}
+      };})
+  };
   forwards to
     if null(localErrors) then @fwrd else errorExpr(localErrors);
 }
