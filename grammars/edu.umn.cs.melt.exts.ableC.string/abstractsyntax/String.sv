@@ -81,8 +81,8 @@ production singleArgExtCallExpr implements ReferenceCall
 top::Expr ::= f::Name @a::Exprs handler::(Expr ::= Expr)
 {
   top.pp = forwardParent.pp;
-  forwards to bindDirectCallExpr(^f, a, \ es::[Expr] ->
-    case es of
+  forwards to bindDirectCallExpr(^f, a,
+    case a.bindRefExprs of
     | [e] -> handler(e)
     | _ -> errorExpr([errFromOrigin(top, s"${f.name} expected exactly 1 argument, got ${toString(a.count)}")])
     end);
@@ -103,6 +103,7 @@ top::Expr ::= e::Expr
 
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
   local localErrors::[Message] = e.errors ++ type.strErrors(e.env) ++
+    checkStringHeaderDef(top.env) ++
     case top.env.allocContext of
     | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
     | _ -> []
@@ -235,6 +236,7 @@ top::Expr ::= e::Expr
   
   nondecorated local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
   local localErrors::[Message] = e.errors ++ showErrors(top.env, type) ++
+    checkStringHeaderDef(top.env) ++
     case top.env.allocContext of
     | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
     | _ -> []
@@ -664,7 +666,9 @@ top::StructDeclarator ::= msg::[Message]
 production assignString implements AssignOp
 top::Expr ::= @lhs::Expr @rhs::Expr
 {
-  forwards to bindAssignOp(lhs, rhs, \ tmpLhs tmpRhs -> hostEqExpr(tmpLhs, strExpr(tmpRhs)));
+  top.pp = pp"${lhs.pp} = ${rhs.pp}";
+  forwards to bindAssignOp(lhs, rhs,
+    hostEqExpr(lhs.bindLhsRefExpr, strExpr(rhs.bindRefExpr)));
 }
 
 production concatString implements BinaryOp
@@ -761,9 +765,9 @@ top::Expr ::= @e1::Expr @e2::Expr
     | _ -> []
     end;
 
-  forward fwrd = bindBinaryOp(e1, e2, \ tmpE1 tmpE2 ->
+  forward fwrd = bindBinaryOp(e1, e2,
     directCallExpr(name("equals_string"),
-      consExpr(strExpr(tmpE1), consExpr(strExpr(tmpE2), nilExpr()))));
+      consExpr(strExpr(e1.bindRefExpr), consExpr(strExpr(e2.bindRefExpr), nilExpr()))));
   forwards to
     if null(localErrors) then @fwrd else errorExpr(localErrors);
 }
@@ -791,10 +795,10 @@ top::Expr ::= @e1::Expr @e2::Expr
 production memberString implements MemberAccess
 top::Expr ::= @lhs::Expr deref::Boolean rhs::Name
 {
-  forwards to bindMemberAccess(lhs, deref, @rhs, \ e ->
+  forwards to bindMemberAccess(lhs, deref, @rhs,
     case rhs.name of
-    | "length" -> ableC_Expr { ((struct _string_s)$Expr{e}).length }
-    | "text"   -> ableC_Expr { ((struct _string_s)$Expr{e}).text }
+    | "length" -> ableC_Expr { ((struct _string_s)$Expr{lhs.bindRefExpr}).length }
+    | "text"   -> ableC_Expr { ((struct _string_s)$Expr{lhs.bindRefExpr}).text }
     | n -> errorExpr([errFromOrigin(rhs, s"string does not have field ${n}")])
     end);
 }
@@ -802,10 +806,10 @@ top::Expr ::= @lhs::Expr deref::Boolean rhs::Name
 production memberCallString implements MemberCall
 top::Expr ::= @lhs::Expr deref::Boolean rhs::Name @a::Exprs
 {
-  forwards to bindMemberCall(lhs, deref, @rhs, a, \ e args ->
-    case rhs.name, args of
-    | "substring", [i1, i2] -> substringString(e, i1, i2)
-    | "copy", [] -> copyString(e)
+  forwards to bindMemberCall(lhs, deref, @rhs, a,
+    case rhs.name, a.bindRefExprs of
+    | "substring", [i1, i2] -> substringString(lhs.bindRefExpr, i1, i2)
+    | "copy", [] -> copyString(lhs.bindRefExpr)
     | n, _ -> errorExpr([errFromOrigin(rhs, s"string does not have method ${n} with ${toString(a.count)} arguments")])
     end);
 }
@@ -875,8 +879,7 @@ top::Expr ::= s::Expr
 production initString implements ExprInitializer
 top::Initializer ::= @e::Expr
 {
-  -- TODO: should be able to be shared?
-  forwards to transformExprInitializer(e, strExpr(^e));
+  forwards to bindExprInitializer(e, strExpr(e.bindRefExpr));
 }
 
 -- Check the given env for the given function name
