@@ -41,11 +41,8 @@ top::ExtType ::=
 }
 
 -- Compute the errors for showing/converting a type to a string.
-monoid attribute showErrors::([Message] ::= Env) with \ _ -> [], joinShowErrors occurs on Type, BuiltinType, ExtType;
-monoid attribute strErrors::([Message] ::= Env) with \ _ -> [], joinShowErrors occurs on Type, BuiltinType, ExtType;
-
-fun joinShowErrors ([Message] ::= Env) ::= e1::([Message] ::= Env) e2::([Message] ::= Env) =
-  \ env::Env -> e1(env) ++ e2(env);
+monoid attribute showErrors::([Message] ::= Env) occurs on Type, BuiltinType, ExtType;
+monoid attribute strErrors::([Message] ::= Env) occurs on Type, BuiltinType, ExtType;
 
 -- Directly coerce a value of some type to a string.
 synthesized attribute directStrProd::(Expr ::= Expr) occurs on Type, BuiltinType, ExtType;
