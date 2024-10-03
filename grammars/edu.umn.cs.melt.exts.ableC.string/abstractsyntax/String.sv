@@ -78,10 +78,10 @@ aspect function getInitialEnvDefs
 }
 
 production singleArgExtCallExpr implements ReferenceCall
-top::Expr ::= f::Name @a::Exprs handler::(Expr ::= Expr)
+top::Expr ::= f::Name a::Exprs handler::(Expr ::= Expr)
 {
-  top.pp = forwardParent.pp;
-  forwards to bindDirectCallExpr(^f, a,
+  top.pp = pp"${f.pp}(${ppImplode(pp", ", a.pps)})";
+  forwards to bindDirectCallExpr(@f, @a,
     case a.bindRefExprs of
     | [e] -> handler(e)
     | _ -> errorExpr([errFromOrigin(top, s"${f.name} expected exactly 1 argument, got ${toString(a.count)}")])
@@ -804,9 +804,10 @@ top::Expr ::= @lhs::Expr deref::Boolean rhs::Name
 }
 
 production memberCallString implements MemberCall
-top::Expr ::= @lhs::Expr deref::Boolean rhs::Name @a::Exprs
+top::Expr ::= @lhs::Expr deref::Boolean rhs::Name a::Exprs
 {
-  forwards to bindMemberCall(lhs, deref, @rhs, a,
+  top.pp = forwardParent.pp;
+  forwards to bindMemberCall(lhs, deref, @rhs, @a,
     case rhs.name, a.bindRefExprs of
     | "substring", [i1, i2] -> substringString(lhs.bindRefExpr, i1, i2)
     | "copy", [] -> copyString(lhs.bindRefExpr)
@@ -877,9 +878,10 @@ top::Expr ::= s::Expr
 }
 
 production initString implements ExprInitializer
-top::Initializer ::= @e::Expr
+top::Initializer ::= e::Expr
 {
-  forwards to bindExprInitializer(e, strExpr(e.bindRefExpr));
+  top.pp = e.pp;
+  forwards to bindExprInitializer(@e, strExpr(e.bindRefExpr));
 }
 
 -- Check the given env for the given function name
