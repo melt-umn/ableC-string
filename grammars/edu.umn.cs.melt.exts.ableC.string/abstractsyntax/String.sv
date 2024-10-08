@@ -104,10 +104,7 @@ top::Expr ::= e::Expr
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
   local localErrors::[Message] = e.errors ++ type.strErrors(e.env) ++
     checkStringHeaderDef(top.env) ++
-    case top.env.allocContext of
-    | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
-    | _ -> []
-    end;
+    allocErrors(top.env);
   local fwrd::Expr = type.directStrProd(^e);
   forwards to mkErrorCheck(localErrors, @fwrd);
 }
@@ -237,10 +234,7 @@ top::Expr ::= e::Expr
   nondecorated local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
   local localErrors::[Message] = e.errors ++ showErrors(top.env, type) ++
     checkStringHeaderDef(top.env) ++
-    case top.env.allocContext of
-    | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
-    | _ -> []
-    end;
+    allocErrors(top.env);
 
   top.buildStr = \ buf::Name len::Name -> (
     nullStmt(), getShowMaxLen(^e, top.env, type),
@@ -685,10 +679,7 @@ top::Expr ::= @e1::Expr @e2::Expr
     attachNote logicalLocationFromOrigin(e2) on
       e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.env)
     end ++
-    case top.env.allocContext of
-    | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
-    | _ -> []
-    end;
+    allocErrors(top.env);
 
   top.typerep = extType(nilQualifier(), stringType());
   top.buildStr = \ buf::Name len::Name ->
@@ -710,10 +701,7 @@ top::Expr ::= @e1::Expr @e2::Expr
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
-    case top.env.allocContext of
-    | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
-    | _ -> []
-    end ++
+    allocErrors(top.env) ++
     checkStringType(e1.typerep, "*") ++
     if e2.typerep.isIntegerType
     then []
@@ -760,10 +748,7 @@ top::Expr ::= @e1::Expr @e2::Expr
       e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.env)
     end ++
     checkStringHeaderDef(top.env) ++
-    case top.env.allocContext of
-    | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
-    | _ -> []
-    end;
+    allocErrors(top.env);
 
   forward fwrd = bindBinaryOp(e1, e2,
     directCallExpr(name("equals_string"),
@@ -824,10 +809,7 @@ top::Expr ::= s::Expr i1::Expr i2::Expr
   local localErrors::[Message] =
     s.errors ++ i1.errors ++ i2.errors ++
     checkStringHeaderDef(top.env) ++
-    case top.env.allocContext of
-    | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
-    | _ -> []
-    end ++
+    allocErrors(top.env) ++
     checkStringType(s.typerep, "substring") ++
     (if i1.typerep.isIntegerType then []
      else [errFromOrigin(i1, "substring indices must have integer type")]) ++
@@ -861,10 +843,7 @@ top::Expr ::= s::Expr
   local localErrors::[Message] =
     s.errors ++
     checkStringHeaderDef(top.env) ++
-    case top.env.allocContext of
-    | unspecifiedAllocContext() :: _ -> [errFromOrigin(top, "An allocator to use must be specfied (e.g. `allocate_using heap;`)")]
-    | _ -> []
-    end ++
+    allocErrors(top.env) ++
     checkStringType(s.typerep, "copy");
 
   nondecorated local bufName::Name = freshName("buf");
