@@ -54,6 +54,8 @@ int main(int argc, char **argv) {
   if (d != "abcdefghij")
     return 4;
 
+  delete d;
+
   string e = show(-1234 + 5);
   printf("e: %s\n", e.text);
 
@@ -107,6 +109,8 @@ int main(int argc, char **argv) {
   printf("m: %s\n", m.text);
   if (m != "\"\\\"abcd\\\\n\\\\n\\\\\\\\\\\"\"")
     return 14;
+
+  delete m;
 
   int nx = 12;
   int *ny = &nx;
@@ -195,6 +199,8 @@ int main(int argc, char **argv) {
   printf("f1: %s\n", f1.text);
   if (f1 != "abc")
     return 28;
+
+  delete f1;
 
   return 0;
 }

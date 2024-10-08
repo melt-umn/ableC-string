@@ -38,6 +38,7 @@ top::ExtType ::=
   top.memberProd = just(memberString);
   top.memberCallProd = just(memberCallString);
   top.exprInitProd = just(initString);
+  top.deleteProd = just(deleteString);
 }
 
 -- Compute the errors for showing/converting a type to a string.

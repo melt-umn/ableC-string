@@ -26,7 +26,7 @@
 
 EXT_NAME=ableC-string
 EXT_GRAMMAR=edu:umn:cs:melt:exts:ableC:string
-EXT_DEPS=ableC-allocation
+EXT_DEPS=ableC-allocation ableC-constructor
 USE_CUSTOM_SILVER=true
 
 # Path from current directory to top level ableC repository

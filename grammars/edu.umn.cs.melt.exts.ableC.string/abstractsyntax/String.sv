@@ -12,6 +12,7 @@ imports edu:umn:cs:melt:ableC:abstractsyntax:builtins;
 --imports edu:umn:cs:melt:ableC:abstractsyntax:debug;
 
 imports edu:umn:cs:melt:exts:ableC:allocation:abstractsyntax;
+imports edu:umn:cs:melt:exts:ableC:constructor:abstractsyntax;
 
 synthesized attribute buildStr::((Stmt, Expr, Stmt) ::= Name Name) occurs on Expr;
 
@@ -861,6 +862,24 @@ top::Initializer ::= e::Expr
 {
   top.pp = e.pp;
   forwards to bindExprInitializer(@e, strExpr(e.bindRefExpr));
+}
+
+production deleteString implements Destructor
+top::Expr ::= e::Expr
+{
+  top.pp = pp"delete ${e.pp}";
+  attachNote extensionGenerated("ableC-string");
+
+  local localErrors::[Message] =
+    checkStringHeaderDef(top.env) ++
+    deallocErrors(top.env) ++
+    checkStringType(e.typerep, "delete");
+  
+  nondecorated local result::Expr = ableC_Expr {
+    deallocate((void*)$Expr{e.bindRefExpr}.text)
+  };
+
+  forwards to bindDestructor(@e, mkErrorCheck(localErrors, result));
 }
 
 -- Check the given env for the given function name
