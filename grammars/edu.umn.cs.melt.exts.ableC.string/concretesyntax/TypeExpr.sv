@@ -9,5 +9,5 @@ marking terminal String_t 'string' lexer classes {Type, Global};
 
 concrete productions top::TypeSpecifier_c
 | 'string'
-    { top.realTypeSpecifiers = [stringTypeExpr(top.givenQualifiers, top.location)];
+    { top.realTypeSpecifiers = [stringTypeExpr(top.givenQualifiers)];
       top.preTypeSpecifiers = []; }
