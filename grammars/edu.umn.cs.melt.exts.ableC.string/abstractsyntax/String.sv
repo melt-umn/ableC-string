@@ -348,7 +348,7 @@ top::Expr ::= e::Expr
     ableC_Expr {
       ({$directTypeExpr{subType.withoutTypeQualifiers} $Name{ptrValName};
         safe_memcpy(&$Name{ptrValName}, $Expr{^e}, sizeof($directTypeExpr{subType.withoutTypeQualifiers}))?
-          $Expr{subType.showMaxLenProd(ableC_Expr { $Name{ptrValName} })} + 1 :
+          $Expr{getShowMaxLen(ableC_Expr { $Name{ptrValName} }, top.env, ^subType)} + 1 :
           $intLiteralExpr{length(show(80, e.typerep)) + 6} + MAX_POINTER_STR_LEN;})
     };
 }
@@ -372,7 +372,7 @@ top::Expr ::= buf::Expr e::Expr
       ({$directTypeExpr{subType.withoutTypeQualifiers} $Name{ptrValName};
         safe_memcpy(&$Name{ptrValName}, $Expr{^e}, sizeof($directTypeExpr{subType.withoutTypeQualifiers}))?
           ($Expr{^buf}[0] = '&',
-           1 + $Expr{subType.showProd(ableC_Expr { $Expr{^buf} + 1 }, declRefExpr(ptrValName))}) :
+           1 + $Expr{getShow(ableC_Expr { $Expr{^buf} + 1 }, declRefExpr(ptrValName), top.env, ^subType)}) :
           sprintf($Expr{@buf}, "<%s at %p>", $stringLiteralExpr{show(80, e.typerep)}, (void*)$Expr{^e});
       })
     };
