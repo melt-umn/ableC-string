@@ -71,6 +71,16 @@ aspect function getInitialEnvDefs
        builtinFunctionValueItem(
          functionType(extType(nilQualifier(), stringType()), noProtoFunctionType(), nilQualifier()),
          singleArgExtCallExpr(showExpr))),
+    valueDef(
+       "showMaxLen",
+       builtinFunctionValueItem(
+         functionType(extType(nilQualifier(), stringType()), noProtoFunctionType(), nilQualifier()),
+         singleArgExtCallExpr(showMaxLenExpr))),
+    valueDef(
+       "showToBuf",
+       builtinFunctionValueItem(
+         functionType(extType(nilQualifier(), stringType()), noProtoFunctionType(), nilQualifier()),
+         twoArgExtCallExpr(showToBufExpr))),
      valueDef(
        "str",
        builtinFunctionValueItem(
@@ -86,6 +96,17 @@ top::Expr ::= f::Name a::Exprs handler::(Expr ::= Expr)
     case a.bindRefExprs of
     | [e] -> handler(e)
     | _ -> errorExpr([errFromOrigin(top, s"${f.name} expected exactly 1 argument, got ${toString(a.count)}")])
+    end);
+}
+
+production twoArgExtCallExpr implements ReferenceCall
+top::Expr ::= f::Name a::Exprs handler::(Expr ::= Expr Expr)
+{
+  top.pp = pp"${f.pp}(${ppImplode(pp", ", a.pps)})";
+  forwards to bindDirectCallExpr(@f, @a,
+    case a.bindRefExprs of
+    | [e1, e2] -> handler(e1, e2)
+    | _ -> errorExpr([errFromOrigin(top, s"${f.name} expected exactly 2 arguments, got ${toString(a.count)}")])
     end);
 }
 
@@ -244,6 +265,34 @@ top::Expr ::= e::Expr
     });
 
   forwards to mkErrorCheck(localErrors, wrapBuildStr(top.buildStr));
+}
+
+production showMaxLenExpr
+top::Expr ::= e::Expr
+{
+  top.pp = pp"showMaxLen(${e.pp})";
+  attachNote extensionGenerated("ableC-string");
+  propagate env, controlStmtContext;
+  
+  nondecorated local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
+  local localErrors::[Message] = e.errors ++ showErrors(top.env, type) ++
+    checkStringHeaderDef(top.env);
+
+  forwards to mkErrorCheck(localErrors, getShowMaxLen(^e, top.env, type));
+}
+
+production showToBufExpr
+top::Expr ::= buf::Expr e::Expr
+{
+  top.pp = pp"showToBuf(${e.pp})";
+  attachNote extensionGenerated("ableC-string");
+  propagate env, controlStmtContext;
+  
+  nondecorated local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
+  local localErrors::[Message] = e.errors ++ showErrors(top.env, type) ++
+    checkStringHeaderDef(top.env);
+
+  forwards to mkErrorCheck(localErrors, getShow(^buf, ^e, top.env, type));
 }
 
 fun showErrors [Message] ::= env::Env type::Type =
