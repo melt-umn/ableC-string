@@ -134,6 +134,7 @@ top::Expr ::= e::Expr
 production directStrExpr
 top::Expr ::= e::Expr strMaxLenProd::(Expr ::= Expr) strProd::(Expr ::= Expr Expr)
 {
+  top.pp = pp"directStr(${e.pp})";
   attachNote extensionGenerated("ableC-string");
   propagate env, controlStmtContext;
 
