@@ -124,9 +124,9 @@ top::Expr ::= e::Expr
     });
 
   local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
-  local localErrors::[Message] = e.errors ++ type.strErrors(e.env) ++
-    checkStringHeaderDef(top.env) ++
-    allocErrors(top.env);
+  local localErrors::[Message] =
+    e.errors ++ type.strErrors(e.env) ++
+    checkStringHeaderDef(top.env);
   local fwrd::Expr = type.directStrProd(^e);
   forwards to mkErrorCheck(localErrors, @fwrd);
 }
@@ -136,14 +136,19 @@ top::Expr ::= e::Expr strMaxLenProd::(Expr ::= Expr) strProd::(Expr ::= Expr Exp
 {
   attachNote extensionGenerated("ableC-string");
   propagate env, controlStmtContext;
+
+  local localErrors::[Message] = allocErrors(top.env);
+
   nondecorated local bufName::Name = freshName("buf");
-  forwards to ableC_Expr {
+  nondecorated local fwrd::Expr = ableC_Expr {
     proto_typedef size_t;
     ({char *$Name{bufName} = allocate($Expr{strMaxLenProd(^e)} + 1);
       ($directTypeExpr{extType(nilQualifier(), stringType())})(struct _string_s){
         $Expr{strProd(directRefExpr(bufName), ^e)}, $Name{bufName}
       };})
   };
+
+  forwards to mkErrorCheck(localErrors, fwrd);
 }
 
 production strStringMaxLen
@@ -797,8 +802,7 @@ top::Expr ::= @e1::Expr @e2::Expr
     attachNote logicalLocationFromOrigin(e2) on
       e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.env)
     end ++
-    checkStringHeaderDef(top.env) ++
-    allocErrors(top.env);
+    checkStringHeaderDef(top.env);
 
   forward fwrd = bindBinaryOp(e1, e2,
     directCallExpr(name("equals_string"),
