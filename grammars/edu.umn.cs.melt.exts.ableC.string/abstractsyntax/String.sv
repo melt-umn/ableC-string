@@ -14,6 +14,13 @@ imports edu:umn:cs:melt:ableC:abstractsyntax:builtins;
 imports edu:umn:cs:melt:exts:ableC:allocation:abstractsyntax;
 imports edu:umn:cs:melt:exts:ableC:constructor:abstractsyntax;
 
+-- Transformation for a string construction expression,
+-- may yield a more efficient implementation by avoiding the creation and copying
+-- of various intermediate buffers.
+-- Takes the names of the buffer and length variables as arguments,
+-- and returns the initial statements (to bind operands),
+-- the length computation expression,
+-- and string construction statements.
 synthesized attribute buildStr::((Stmt, Expr, Stmt) ::= Name Name) occurs on Expr;
 
 function wrapBuildStr
@@ -81,6 +88,11 @@ aspect function getInitialEnvDefs
        builtinFunctionValueItem(
          functionType(extType(nilQualifier(), stringType()), noProtoFunctionType(), nilQualifier()),
          twoArgExtCallExpr(showToBufExpr))),
+    valueDef(
+       "buildStr",
+       builtinFunctionValueItem(
+         functionType(extType(nilQualifier(), stringType()), noProtoFunctionType(), nilQualifier()),
+         buildStrExpr)),
      valueDef(
        "str",
        builtinFunctionValueItem(
@@ -108,6 +120,56 @@ top::Expr ::= f::Name a::Exprs handler::(Expr ::= Expr Expr)
     | [e1, e2] -> handler(e1, e2)
     | _ -> errorExpr([errFromOrigin(top, s"${f.name} expected exactly 2 arguments, got ${toString(a.count)}")])
     end);
+}
+
+production buildStrExpr implements ReferenceCall
+top::Expr ::= f::Name a::Exprs
+{
+  top.pp = pp"buildStr(${ppImplode(pp", ", a.pps)})";
+
+  local localErrors::[Message] =
+    case a of
+    | consExpr(buf, consExpr(e, nilExpr())) ->
+      case buf.typerep.defaultFunctionArrayLvalueConversion of
+      | pointerType(_, builtinType(q, signedType(charType())))
+          when !containsBy(qualifierCompat, constQualifier(), q.qualifiers) -> []
+      | pointerType(_, builtinType(q, unsignedType(charType())))
+          when !containsBy(qualifierCompat, constQualifier(), q.qualifiers) -> []
+      | _ -> [errFromOrigin(buf, "Buffer must be a non-const char pointer")]
+      end ++
+      checkStringHeaderDef(top.env) ++
+      checkStringType(e.typerep, "buildStr")
+    | _ -> [errFromOrigin(top, "buildStr expected exactly 2 arguments")]
+    end;
+
+  local buf::Decorated Expr =
+    case a of
+    | consExpr(e, _) -> e
+    | _ -> error("Demanded buf with wrong number of arguments")
+    end;
+  local e::Decorated Expr =
+    case a of
+    | consExpr(_, consExpr(e, nilExpr())) -> e
+    | _ -> error("Demanded e with wrong number of arguments")
+    end;
+
+  nondecorated local bufName::Name = freshName("buf");
+  nondecorated local lenName::Name = freshName("len");
+  local impls::(Stmt, Expr, Stmt) = e.buildStr(bufName, lenName);
+
+  nondecorated local fwrd::Expr = ableC_Expr {
+    proto_typedef size_t;
+    ({char *$Name{bufName} = $Expr{^buf};
+      size_t $Name{lenName} = 0;
+      $Stmt{impls.1}
+      // Note that the length computation expression is not used here,
+      // as the buffer has already been allocated.
+      $Stmt{impls.3}
+      $Name{lenName};
+    })
+  };
+
+  forwards to transformDirectCallExpr(@f, @a, mkErrorCheck(localErrors, fwrd));
 }
 
 production strExpr
@@ -255,7 +317,6 @@ production showExpr
 top::Expr ::= e::Expr
 {
   top.pp = pp"show(${e.pp})";
-  attachNote extensionGenerated("ableC-string");
   propagate env, controlStmtContext;
   top.typerep = extType(nilQualifier(), stringType());
   
@@ -860,6 +921,7 @@ top::Expr ::= s::Expr i1::Expr i2::Expr
 {
   top.pp = pp"${s}.substring(${i1}, ${i2})";
   attachNote extensionGenerated("ableC-string");
+  top.typerep = extType(nilQualifier(), stringType());
 
   local localErrors::[Message] =
     s.errors ++ i1.errors ++ i2.errors ++
@@ -894,6 +956,7 @@ top::Expr ::= s::Expr
 {
   top.pp = pp"${s}.copy()";
   attachNote extensionGenerated("ableC-string");
+  top.typerep = extType(nilQualifier(), stringType());
 
   local localErrors::[Message] =
     s.errors ++
@@ -934,6 +997,23 @@ top::Expr ::= e::Expr
   };
 
   forwards to bindDestructor(@e, mkErrorCheck(localErrors, result));
+}
+
+production wrapOneErrorExpr
+top::Expr ::= e::Expr
+{
+  top.pp = pp"errorExpr(${e.pp})";
+  forward fwrd = @e;
+  forwards to errorExpr(e.errors);
+}
+
+production wrapTwoErrorExpr
+top::Expr ::= e1::Expr e2::Expr
+{
+  top.pp = pp"errorExpr(${e1.pp}, ${e2.pp})";
+  forward fwrd1 = @e1;
+  forward fwrd2 = @e2;
+  forwards to errorExpr(e1.errors ++ e2.errors);
 }
 
 -- Check the given env for the given function name

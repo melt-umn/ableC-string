@@ -80,11 +80,11 @@ aspect production errorType
 top::Type ::= 
 {
   propagate showErrors, strErrors;
-  top.directStrProd = \ _ -> errorExpr([]);
-  top.strMaxLenProd = \ _ -> errorExpr([]);
-  top.strProd = \ _ _ -> errorExpr([]);
-  top.showMaxLenProd = \ _ -> errorExpr([]);
-  top.showProd = \ _ _ -> errorExpr([]);
+  top.directStrProd = wrapOneErrorExpr;
+  top.strMaxLenProd = wrapOneErrorExpr;
+  top.strProd = wrapTwoErrorExpr;
+  top.showMaxLenProd = wrapOneErrorExpr;
+  top.showProd = wrapTwoErrorExpr;
 }
 
 aspect production pointerType
