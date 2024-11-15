@@ -79,6 +79,11 @@ aspect function getInitialEnvDefs
          functionType(extType(nilQualifier(), stringType()), noProtoFunctionType(), nilQualifier()),
          singleArgExtCallExpr(showExpr))),
     valueDef(
+       "showWith",
+       builtinFunctionValueItem(
+         functionType(extType(nilQualifier(), stringType()), noProtoFunctionType(), nilQualifier()),
+         twoArgExtCallExpr(showWithExpr))),
+    valueDef(
        "showMaxLen",
        builtinFunctionValueItem(
          functionType(extType(nilQualifier(), stringType()), noProtoFunctionType(), nilQualifier()),
@@ -333,7 +338,6 @@ top::Expr ::= e::Expr
 
   forwards to mkErrorCheck(localErrors, wrapBuildStr(top.buildStr));
 }
-
 production showMaxLenExpr
 top::Expr ::= e::Expr
 {
@@ -360,6 +364,22 @@ top::Expr ::= buf::Expr e::Expr
     checkStringHeaderDef(top.env);
 
   forwards to mkErrorCheck(localErrors, getShow(^buf, ^e, top.env, type));
+}
+
+production showWithExpr
+top::Expr ::= fn::Expr e::Expr
+{
+  top.pp = pp"showWith(${fn.pp}, ${e.pp})";
+  top.typerep = extType(nilQualifier(), stringType());
+
+  top.buildStr = \ buf::Name len::Name -> (
+    nullStmt(),
+    errorExpr([errFromOrigin(top, "showWith should only be used within buildStr")]),
+    ableC_Stmt {
+      $Name{len} += $Expr{^fn}($Name{buf} + $Name{len}, $Expr{^e});
+    });
+
+  forwards to wrapBuildStr(top.buildStr);
 }
 
 fun showErrors [Message] ::= env::Env type::Type =
@@ -786,7 +806,6 @@ production concatString implements BinaryOp
 top::Expr ::= @e1::Expr @e2::Expr
 {
   top.pp = pp"${e1.pp} + ${e2.pp}";
-  attachNote extensionGenerated("ableC-string");
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
@@ -814,7 +833,6 @@ production repeatString implements BinaryOp
 top::Expr ::= @e1::Expr @e2::Expr
 {
   top.pp = pp"${e1.pp} * ${e2.pp}";
-  attachNote extensionGenerated("ableC-string");
   
   local localErrors::[Message] =
     e1.errors ++ e2.errors ++
