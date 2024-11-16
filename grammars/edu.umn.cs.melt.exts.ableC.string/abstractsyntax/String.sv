@@ -749,7 +749,6 @@ aspect production structField
 top::StructDeclarator ::= name::Name  ty::TypeModifierExpr  attrs::Attributes
 {
   attachNote extensionGenerated("ableC-string");
-  local checkExpr::Expr = errorExpr([]);
   top.showErrors := \ env::Env ->
     attachNote logicalLocationFromOrigin(top) on showErrors(env, top.typerep) end;
   local fieldStrLen::Integer = length("." ++ name.name ++ " = ");
@@ -767,7 +766,6 @@ aspect production structBitfield
 top::StructDeclarator ::= name::MaybeName  ty::TypeModifierExpr  e::Expr  attrs::Attributes
 {
   attachNote extensionGenerated("ableC-string");
-  local checkExpr::Expr = errorExpr([]);
   top.showErrors := \ env::Env ->
     attachNote logicalLocationFromOrigin(top) on showErrors(env, top.typerep) end;
   local fieldStrLen::Integer = length("." ++ name.maybename.fromJust.name ++ " = ");

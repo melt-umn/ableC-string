@@ -72,8 +72,13 @@ top::Type ::=
   top.directStrProd = directStrExpr(_, top.strMaxLenProd, top.strProd);
   top.strMaxLenProd = error("Undefined");
   top.strProd = error("Undefined");
-  top.showMaxLenProd = error("Undefined");
-  top.showProd = error("Undefined");
+
+  -- The only way for these to be demanded is if we try to compute the show translation
+  -- with a different environment than the one that was used to compute the errors.
+  top.showMaxLenProd = \ _ ->
+    errorExpr([errFromOrigin(ambientOrigin(), s"Custom show declaration for type ${show(80, ^top)} (if any) is not visible for some use of this type")]);
+  top.showProd = \ _ _ ->
+    errorExpr([errFromOrigin(ambientOrigin(), s"Custom show declaration for type ${show(80, ^top)} (if any) is not visible for some use of this type")]);
 }
 
 aspect production errorType
@@ -336,10 +341,16 @@ top::ExtType ::=
     \ env::Env->
       [errFromOrigin(ambientOrigin(), s"str is not defined for type ${show(80, extType(nilQualifier(), ^top))}")];
   top.directStrProd = directStrExpr(_, top.strMaxLenProd, top.strProd);
+
   top.strMaxLenProd = error("Undefined");
   top.strProd = error("Undefined");
-  top.showMaxLenProd = error("Undefined");
-  top.showProd = error("Undefined");
+
+  -- The only way for these to be demanded is if we try to compute the show translation
+  -- with a different environment than the one that was used to compute the errors.
+  top.showMaxLenProd = \ _ ->
+    errorExpr([errFromOrigin(ambientOrigin(), s"Custom show declaration for type ${show(80, ^top)} (if any) is not visible for some use of this type")]);
+  top.showProd = \ _ _ ->
+    errorExpr([errFromOrigin(ambientOrigin(), s"Custom show declaration for type ${show(80, ^top)} (if any) is not visible for some use of this type")]);
 }
 
 aspect production stringType
