@@ -69,6 +69,30 @@ top::Expr ::= s::Stmt e::Expr
     end;
 }
 
+aspect production conditionalExpr
+top::Expr ::= cond::Expr  t::Expr  e::Expr
+{
+  nondecorated local condName::Name = freshName("cond");
+  top.buildStr = \ buf::Name len::Name ->
+    let buildT::(Stmt, Expr, Stmt) = t.buildStr(buf, len),
+        buildE::(Stmt, Expr, Stmt) = e.buildStr(buf, len)
+    in (
+      ableC_Stmt {
+        _Bool $Name{condName} = $Expr{^cond};
+        $Stmt{buildT.1}
+        $Stmt{buildE.1}
+      },
+      ableC_Expr { $Name{condName}? $Expr{buildT.2} : $Expr{buildE.2} },
+      ableC_Stmt {
+        if ($Name{condName}) {
+          $Stmt{buildT.3}
+        } else {
+          $Stmt{buildE.3}
+        }
+      })
+    end;
+}
+
 aspect function getInitialEnvDefs
 [Def] ::=
 {
@@ -237,7 +261,6 @@ production directStrCharPointer
 top::Expr ::= e::Expr
 {
   top.pp = pp"strCharPointer(${e.pp})";
-  attachNote extensionGenerated("ableC-string");
 
   forward nonConst = directStrExpr(@e, strCharPointerMaxLen, strCharPointer);
   forwards to
@@ -423,13 +446,14 @@ top::Expr ::= buf::Expr e::Expr
 }
 
 synthesized attribute maxEnumItemLen::Integer;
-attribute directStrProd, maxEnumItemLen, showProd occurs on EnumDecl, EnumItemList;
+attribute directStrProd, maxEnumItemLen, strProd, showProd occurs on EnumDecl, EnumItemList;
 
 aspect production enumDecl
 top::EnumDecl ::= name::MaybeName  dcls::EnumItemList
 {
   top.directStrProd = dcls.directStrProd;
   top.maxEnumItemLen = dcls.maxEnumItemLen;
+  top.strProd = dcls.strProd;
   top.showProd = dcls.showProd;
 }
 
@@ -441,10 +465,16 @@ top::EnumItemList ::= h::EnumItem  t::EnumItemList
   top.directStrProd = \ e::Expr ->
     ableC_Expr {
       $Expr{e} == $name{h.name}?
-        $Expr{strExpr(mkStringConst(h.name))} :
+        $Expr{directStrCharPointer(mkStringConst(h.name))} :
         $Expr{t.directStrProd(e)}
     };
   top.maxEnumItemLen = max(length(h.name), t.maxEnumItemLen);
+  top.strProd = \ buf::Expr e::Expr ->
+    ableC_Expr {
+      $Expr{e} == $name{h.name}?
+        strcpy($Expr{buf}, $stringLiteralExpr{h.name}), $intLiteralExpr{length(h.name)} :
+        $Expr{t.strProd(buf, e)}
+    };
   top.showProd = \ buf::Expr e::Expr ->
     ableC_Expr {
       $Expr{e} == $name{h.name}?
@@ -460,6 +490,10 @@ top::EnumItemList ::=
 
   top.directStrProd = signedType(intType()).directStrProd;
   top.maxEnumItemLen = length(show(80, top.containingEnum)) + 24;
+  top.strProd = \ buf::Expr e::Expr ->
+    ableC_Expr {
+      sprintf($Expr{buf}, "%d", $Expr{e})
+    };
   top.showProd = \ buf::Expr e::Expr ->
     ableC_Expr {
       sprintf($Expr{buf}, "<%s %d>", $stringLiteralExpr{show(80, top.containingEnum)}, $Expr{e})
@@ -827,6 +861,31 @@ top::Expr ::= @e1::Expr @e2::Expr
     if null(localErrors) then @fwrd else errorExpr(localErrors);
 }
 
+production concatEqString implements AssignOp
+top::Expr ::= @e1::Expr @e2::Expr
+{
+  top.pp = pp"${e1.pp} += ${e2.pp}";
+  
+  local localErrors::[Message] =
+    e1.errors ++ e2.errors ++
+    attachNote logicalLocationFromOrigin(e2) on
+      e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.env)
+    end ++
+    assignErrors(e1, e2) ++
+    allocErrors(top.env);
+
+  top.typerep = extType(nilQualifier(), stringType());
+  local buildStr::((Stmt, Expr, Stmt) ::= Name Name) = \ buf::Name len::Name ->
+    let buildE1::(Stmt, Expr, Stmt) = e1.buildStr(buf, len),
+        buildE2::(Stmt, Expr, Stmt) = e2.buildStr(buf, len)
+    in (seqStmt(buildE1.1, buildE2.1), addExpr(buildE1.2, buildE2.2), seqStmt(buildE1.3, buildE2.3))
+    end;
+
+  forward fwrd = transformBinaryOp(e1, e2, eqExpr(^e1, wrapBuildStr(buildStr)));
+  forwards to
+    if null(localErrors) then @fwrd else errorExpr(localErrors);
+}
+
 production repeatString implements BinaryOp
 top::Expr ::= @e1::Expr @e2::Expr
 {
@@ -858,6 +917,7 @@ top::Expr ::= @e1::Expr @e2::Expr
         for (size_t $Name{iName} = 0; $Name{iName} < $Name{countName}; $Name{iName}++) {
           $Stmt{buildE1.3}
         }
+        $Name{buf}[$Name{len}] = '\0';
       })
     end;
 

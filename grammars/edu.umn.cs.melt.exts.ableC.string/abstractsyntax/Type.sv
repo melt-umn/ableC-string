@@ -30,7 +30,7 @@ top::ExtType ::=
   top.rAddProd = just(concatString);
   top.lMulProd = just(repeatString);
   top.lEqualsProd = just(equalsString);
-  top.rEqualsProd = just(equalsString);
+  top.addEqProd = just(concatEqString);
   top.arraySubscriptProd = just(subscriptString);
   -- Better error message than default one about not being an lvalue
   top.addressOfArraySubscriptProd =
@@ -408,7 +408,7 @@ top::ExtType ::= ref::Decorated EnumDecl
   top.strErrors := checkStringHeaderDef;
   top.directStrProd = ref.directStrProd;
   top.strMaxLenProd = \ _ -> mkIntConst(ref.maxEnumItemLen);
-  top.strProd = \ buf::Expr e::Expr -> ableC_Expr { sprintf($Expr{buf}, "%s", ref.directStrProd(e)) };
+  top.strProd = ref.strProd;
   top.showMaxLenProd = \ _ -> mkIntConst(ref.maxEnumItemLen);
   top.showProd = ref.showProd;
 }

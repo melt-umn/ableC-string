@@ -202,5 +202,12 @@ int main(int argc, char **argv) {
 
   delete f1;
 
+  string g1 = "";
+  for (int i = 0; i < 10; i++)
+    g1 += i + (i % 2 ? str("a") : str("b") * i);
+  printf("g1: %s\n", g1.text);
+  if (g1 != "01a2bb3a4bbbb5a6bbbbbb7a8bbbbbbbb9a")
+    return 29;
+
   return 0;
 }
