@@ -871,7 +871,6 @@ top::Expr ::= @e1::Expr @e2::Expr
     attachNote logicalLocationFromOrigin(e2) on
       e2.typerep.defaultFunctionArrayLvalueConversion.strErrors(e2.env)
     end ++
-    assignErrors(e1, e2) ++
     allocErrors(top.env);
 
   top.typerep = extType(nilQualifier(), stringType());
@@ -881,7 +880,7 @@ top::Expr ::= @e1::Expr @e2::Expr
     in (seqStmt(buildE1.1, buildE2.1), addExpr(buildE1.2, buildE2.2), seqStmt(buildE1.3, buildE2.3))
     end;
 
-  forward fwrd = transformBinaryOp(e1, e2, eqExpr(^e1, wrapBuildStr(buildStr)));
+  forward fwrd = transformAssignOp(e1, e2, eqExpr(^e1, wrapBuildStr(buildStr)));
   forwards to
     if null(localErrors) then @fwrd else errorExpr(localErrors);
 }
