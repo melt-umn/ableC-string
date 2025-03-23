@@ -278,7 +278,13 @@ production strCharPointerMaxLen
 top::Expr ::= e::Expr
 {
   attachNote extensionGenerated("ableC-string");
-  forwards to ableC_Expr { strlen($Expr{@e}) };
+
+  forward nonConst = ableC_Expr { strlen($Expr{@e}) };
+  forwards to
+    case e of
+    | stringLiteral(l) -> mkIntConst(length(unescapeString(l)) - 2)
+    | _ -> @nonConst
+    end;
 }
 
 production strCharPointer
