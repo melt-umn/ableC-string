@@ -277,6 +277,7 @@ top::Expr ::= e::Expr
 production strCharPointerMaxLen
 top::Expr ::= e::Expr
 {
+  top.pp = pp"strCharPointerMaxLen(${e.pp})";
   attachNote extensionGenerated("ableC-string");
 
   forward nonConst = ableC_Expr { strlen($Expr{@e}) };
