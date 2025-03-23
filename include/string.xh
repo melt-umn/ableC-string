@@ -78,7 +78,6 @@ static inline size_t escape_char(char *buf, char c) {
       buf[bufIndex++] = 'v';
       break;
     case '\"':
-    case '\'':
     case '\\':
   //case '\?':
       buf[bufIndex++] = '\\';
@@ -95,7 +94,12 @@ static inline size_t escape_char(char *buf, char c) {
 static inline size_t show_char(char *buf, char c) {
   size_t bufIndex = 0;
   buf[bufIndex++] = '\'';
-  bufIndex += escape_char(buf + bufIndex, c);
+  if (c == '\'') {
+    buf[bufIndex++] = '\\';
+    buf[bufIndex++] = '\'';
+  } else {
+    bufIndex += escape_char(buf + bufIndex, c);
+  }
   buf[bufIndex++] = '\'';
   buf[bufIndex] = '\0';
 
