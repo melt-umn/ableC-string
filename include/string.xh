@@ -130,7 +130,7 @@ static void _handle_sig(int sig) {
 
 static struct sigaction _old_segv, _old_bus;
 static inline void _set_handler() {
-  struct sigaction sa;
+  struct sigaction sa = {0};
   sa.sa_handler = _handle_sig;
   sa.sa_flags |= SA_NODEFER;
   sigemptyset(&sa.sa_mask);
