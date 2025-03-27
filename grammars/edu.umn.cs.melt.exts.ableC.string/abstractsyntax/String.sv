@@ -18,21 +18,25 @@ imports edu:umn:cs:melt:exts:ableC:constructor:abstractsyntax;
 -- may yield a more efficient implementation by avoiding the creation and copying
 -- of various intermediate buffers.
 -- Takes the names of the buffer and length variables as arguments,
--- and returns the initial statements (to bind operands),
+-- and returns a list of bindings for the operands,
 -- the length computation expression,
 -- and string construction statements.
-synthesized attribute buildStr::((Stmt, Expr, Stmt) ::= Name Name) occurs on Expr;
+type StrBuilder = ([(Type, Name, Expr)], Expr, Stmt);
+synthesized attribute buildStr::(StrBuilder ::= Name Name) occurs on Expr;
+
+fun makeBindings Stmt ::= b::[(Type, Name, Expr)] =
+  foldStmt(map(\ d::(Type, Name, Expr) -> ableC_Stmt { $directTypeExpr{d.1} $Name{d.2} = $Expr{d.3}; }, b));
 
 function wrapBuildStr
-Expr ::= buildStr::((Stmt, Expr, Stmt) ::= Name Name)
+Expr ::= buildStr::(StrBuilder ::= Name Name)
 {
   nondecorated local bufName::Name = freshName("buf");
   nondecorated local lenName::Name = freshName("len");
-  local impls::(Stmt, Expr, Stmt) = buildStr(bufName, lenName);
+  local impls::StrBuilder = buildStr(bufName, lenName);
   
   return ableC_Expr {
     proto_typedef size_t;
-    ({$Stmt{impls.1}
+    ({$Stmt{makeBindings(impls.1)};
       char *$Name{bufName} = allocate($Expr{impls.2} + 1);
       size_t $Name{lenName} = 0;
       $Stmt{impls.3}
@@ -43,13 +47,13 @@ Expr ::= buildStr::((Stmt, Expr, Stmt) ::= Name Name)
 }
 
 function defaultBuildStr
-(Stmt, Expr, Stmt) ::= top::Decorated Expr buf::Name len::Name
+StrBuilder ::= e::Decorated Expr buf::Name len::Name
 {
-  local type::Type = top.typerep.defaultFunctionArrayLvalueConversion;
+  local type::Type = e.typerep.defaultFunctionArrayLvalueConversion;
   nondecorated local tmpName::Name = freshName("str");
-  nondecorated local tmpRef::Expr = if top.isSimple then ^top else declRefExpr(tmpName);
+  nondecorated local tmpRef::Expr = if e.isSimple then ^e else declRefExpr(tmpName);
   return (
-    if top.isSimple then nullStmt() else declStmt(autoDecl(tmpName, ^top)),
+    if e.isSimple then [] else [(e.typerep, tmpName, ^e)],
     type.strMaxLenProd(tmpRef),
     ableC_Stmt { $Name{^len} += $Expr{type.strProd(ableC_Expr { $Name{^buf} + $Name{^len} }, tmpRef)}; });
 }
@@ -60,28 +64,21 @@ top::Expr ::=
   top.buildStr = defaultBuildStr(top, _, _);
 }
 
-aspect production stmtExpr
-top::Expr ::= s::Stmt e::Expr
-{
-  top.buildStr = \ buf::Name len::Name ->
-    let buildE::(Stmt, Expr, Stmt) = e.buildStr(buf, len)
-    in (seqStmt(^s, buildE.1), buildE.2, buildE.3)
-    end;
-}
-
 aspect production conditionalExpr
 top::Expr ::= cond::Expr  t::Expr  e::Expr
 {
   nondecorated local condName::Name = freshName("cond");
   top.buildStr = \ buf::Name len::Name ->
-    let buildT::(Stmt, Expr, Stmt) = t.buildStr(buf, len),
-        buildE::(Stmt, Expr, Stmt) = e.buildStr(buf, len)
+    let buildT::StrBuilder = t.buildStr(buf, len),
+        buildE::StrBuilder = e.buildStr(buf, len)
     in (
-      ableC_Stmt {
-        _Bool $Name{condName} = $Expr{^cond};
-        $Stmt{buildT.1}
-        $Stmt{buildE.1}
-      },
+      (builtinType(nilQualifier(), boolType()), condName, ^cond) ::
+        map(\ d::(Type, Name, Expr) ->
+          (d.1, d.2, conditionalExpr(declRefExpr(condName), d.3, defaultInitExpr(d.1))),
+          buildT.1) ++
+        map(\ d::(Type, Name, Expr) ->
+          (d.1, d.2, conditionalExpr(declRefExpr(condName), defaultInitExpr(d.1), d.3)),
+          buildE.1),
       ableC_Expr { $Name{condName}? $Expr{buildT.2} : $Expr{buildE.2} },
       ableC_Stmt {
         if ($Name{condName}) {
@@ -184,13 +181,13 @@ top::Expr ::= f::Name a::Exprs
 
   nondecorated local bufName::Name = freshName("buf");
   nondecorated local lenName::Name = freshName("len");
-  local impls::(Stmt, Expr, Stmt) = e.buildStr(bufName, lenName);
+  local impls::StrBuilder = e.buildStr(bufName, lenName);
 
   nondecorated local fwrd::Expr = ableC_Expr {
     proto_typedef size_t;
     ({char *$Name{bufName} = $Expr{^buf};
       size_t $Name{lenName} = 0;
-      $Stmt{impls.1}
+      $Stmt{makeBindings(impls.1)}
       // Note that the length computation expression is not used here,
       // as the buffer has already been allocated.
       $Stmt{impls.3}
@@ -209,7 +206,7 @@ top::Expr ::= e::Expr
   top.typerep = extType(nilQualifier(), stringType());
 
   top.buildStr = \ buf::Name len::Name -> (
-    nullStmt(), type.strMaxLenProd(^e),
+    [], type.strMaxLenProd(^e),
     ableC_Stmt {
       $Name{len} += $Expr{type.strProd(ableC_Expr { $Name{buf} + $Name{len} }, ^e)};
     });
@@ -361,7 +358,7 @@ top::Expr ::= e::Expr
     allocErrors(top.env);
 
   top.buildStr = \ buf::Name len::Name -> (
-    nullStmt(), getShowMaxLen(^e, top.env, type),
+    [], getShowMaxLen(^e, top.env, type),
     ableC_Stmt {
       $Name{len} += $Expr{getShow(ableC_Expr { $Name{buf} + $Name{len} }, ^e, top.env, type)};
     });
@@ -403,7 +400,7 @@ top::Expr ::= fn::Expr e::Expr
   top.typerep = extType(nilQualifier(), stringType());
 
   top.buildStr = \ buf::Name len::Name -> (
-    nullStmt(),
+    [],
     errorExpr([errFromOrigin(top, "showWith should only be used within buildStr")]),
     ableC_Stmt {
       $Name{len} += $Expr{^fn}($Name{buf} + $Name{len}, $Expr{^e});
@@ -858,9 +855,9 @@ top::Expr ::= @e1::Expr @e2::Expr
 
   top.typerep = extType(nilQualifier(), stringType());
   top.buildStr = \ buf::Name len::Name ->
-    let buildE1::(Stmt, Expr, Stmt) = e1.buildStr(buf, len),
-        buildE2::(Stmt, Expr, Stmt) = e2.buildStr(buf, len)
-    in (seqStmt(buildE1.1, buildE2.1), addExpr(buildE1.2, buildE2.2), seqStmt(buildE1.3, buildE2.3))
+    let buildE1::StrBuilder = e1.buildStr(buf, len),
+        buildE2::StrBuilder = e2.buildStr(buf, len)
+    in (buildE1.1 ++ buildE2.1, addExpr(buildE1.2, buildE2.2), seqStmt(buildE1.3, buildE2.3))
     end;
 
   forward fwrd = transformBinaryOp(e1, e2, wrapBuildStr(top.buildStr));
@@ -881,10 +878,10 @@ top::Expr ::= @e1::Expr @e2::Expr
     allocErrors(top.env);
 
   top.typerep = extType(nilQualifier(), stringType());
-  local buildStr::((Stmt, Expr, Stmt) ::= Name Name) = \ buf::Name len::Name ->
-    let buildE1::(Stmt, Expr, Stmt) = e1.buildStr(buf, len),
-        buildE2::(Stmt, Expr, Stmt) = e2.buildStr(buf, len)
-    in (seqStmt(buildE1.1, buildE2.1), addExpr(buildE1.2, buildE2.2), seqStmt(buildE1.3, buildE2.3))
+  local buildStr::(StrBuilder ::= Name Name) = \ buf::Name len::Name ->
+    let buildE1::StrBuilder = e1.buildStr(buf, len),
+        buildE2::StrBuilder = e2.buildStr(buf, len)
+    in (buildE1.1 ++ buildE2.1, addExpr(buildE1.2, buildE2.2), seqStmt(buildE1.3, buildE2.3))
     end;
 
   forward fwrd = transformAssignOp(e1, e2, eqExpr(^e1, wrapBuildStr(buildStr)));
@@ -909,14 +906,15 @@ top::Expr ::= @e1::Expr @e2::Expr
 
   nondecorated local countName::Name = freshName("count");
   nondecorated local iName::Name = freshName("i");
+  nondecorated local sizeType::Type =
+    case lookupValue("size_t", top.env) of
+    | ty :: _ -> ty.typerep
+    | _ -> errorType()
+    end;
   top.buildStr = \ buf::Name len::Name ->
-    let buildE1::(Stmt, Expr, Stmt) = e1.buildStr(buf, len)
+    let buildE1::StrBuilder = e1.buildStr(buf, len)
     in (
-      ableC_Stmt {
-        proto_typedef size_t;
-        $Stmt{buildE1.1}
-        size_t $Name{countName} = $Expr{^e2};
-      },
+      buildE1.1 ++ [(sizeType, countName, ^e2)],
       mulExpr(buildE1.2, declRefExpr(countName)),
       ableC_Stmt {
         proto_typedef size_t;
