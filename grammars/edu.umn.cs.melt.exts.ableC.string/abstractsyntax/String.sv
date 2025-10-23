@@ -830,6 +830,22 @@ top::StructDeclarator ::= msg::[Message]
   propagate showErrors, showMaxLenTransform, showTransform;
 }
 
+-- Seeding dispatch flow deps
+aspect production defaultEqExpr
+top::Expr ::= @lhs::Expr @rhs::Expr
+{
+  top.buildStr =
+    if true then defaultBuildStr(top, _, _)
+    else error(hackUnparse(lhs.buildStr) ++ hackUnparse(rhs.buildStr));
+}
+aspect production defaultAddExpr
+top::Expr ::= @lhs::Expr @rhs::Expr
+{
+  top.buildStr =
+    if true then defaultBuildStr(top, _, _)
+    else error(hackUnparse(lhs.buildStr) ++ hackUnparse(rhs.buildStr));
+}
+
 production assignString implements AssignOp
 top::Expr ::= @lhs::Expr @rhs::Expr
 {
@@ -860,9 +876,10 @@ top::Expr ::= @e1::Expr @e2::Expr
     in (buildE1.1 ++ buildE2.1, addExpr(buildE1.2, buildE2.2), seqStmt(buildE1.3, buildE2.3))
     end;
 
-  forward fwrd = transformBinaryOp(e1, e2, wrapBuildStr(top.buildStr));
-  forwards to
-    if null(localErrors) then @fwrd else errorExpr(localErrors);
+  forwards to transformBinaryOp(e1, e2,
+    if null(localErrors)
+    then wrapBuildStr(top.buildStr)
+    else errorExpr(localErrors));
 }
 
 production concatEqString implements AssignOp
@@ -884,9 +901,10 @@ top::Expr ::= @e1::Expr @e2::Expr
     in (buildE1.1 ++ buildE2.1, addExpr(buildE1.2, buildE2.2), seqStmt(buildE1.3, buildE2.3))
     end;
 
-  forward fwrd = transformAssignOp(e1, e2, eqExpr(^e1, wrapBuildStr(buildStr)));
-  forwards to
-    if null(localErrors) then @fwrd else errorExpr(localErrors);
+  forwards to transformAssignOp(e1, e2,
+    if null(localErrors)
+    then eqExpr(^e1, wrapBuildStr(buildStr))
+    else errorExpr(localErrors));
 }
 
 production repeatString implements BinaryOp
@@ -925,9 +943,10 @@ top::Expr ::= @e1::Expr @e2::Expr
       })
     end;
 
-  forward fwrd = transformBinaryOp(e1, e2, wrapBuildStr(top.buildStr));
-  forwards to
-    if null(localErrors) then @fwrd else errorExpr(localErrors);
+  forwards to transformBinaryOp(e1, e2,
+    if null(localErrors)
+    then wrapBuildStr(top.buildStr)
+    else errorExpr(localErrors));
 }
 
 production equalsString implements BinaryOp
@@ -937,7 +956,6 @@ top::Expr ::= @e1::Expr @e2::Expr
   attachNote extensionGenerated("ableC-string");
   
   local localErrors::[Message] =
-    e1.errors ++ e2.errors ++
     attachNote logicalLocationFromOrigin(e1) on
       e1.typerep.defaultFunctionArrayLvalueConversion.strErrors(e1.env)
     end ++
@@ -946,11 +964,11 @@ top::Expr ::= @e1::Expr @e2::Expr
     end ++
     checkStringHeaderDef(top.env);
 
-  forward fwrd = bindBinaryOp(e1, e2,
-    directCallExpr(name("equals_string"),
-      consExpr(strExpr(e1.bindRefExpr), consExpr(strExpr(e2.bindRefExpr), nilExpr()))));
-  forwards to
-    if null(localErrors) then @fwrd else errorExpr(localErrors);
+  forwards to bindBinaryOp(e1, e2,
+    if null(localErrors)
+    then directCallExpr(name("equals_string"),
+      consExpr(strExpr(e1.bindRefExpr), consExpr(strExpr(e2.bindRefExpr), nilExpr())))
+    else errorExpr(localErrors));
 }
 
 production subscriptString implements BinaryOp
@@ -968,9 +986,11 @@ top::Expr ::= @e1::Expr @e2::Expr
     then []
     else [errFromOrigin(e2, s"string index must have integer type, but got ${show(80, e2.typerep)}")];
 
-  forward fwrd = callBinaryOp(e1, e2, name("subscript_string"), nilExpr());
-  forwards to
-    if null(localErrors) then @fwrd else errorExpr(localErrors);
+  local impl::BinaryOp =
+    if null(localErrors)
+    then callBinaryOp(name("subscript_string"), nilExpr())
+    else transformBinaryOp(errorExpr(localErrors));
+  forwards to impl(e1, e2);
 }
 
 production memberString implements MemberAccess
