@@ -30,7 +30,7 @@ EXT_DEPS=ableC-allocation ableC-constructor
 USE_CUSTOM_SILVER=true
 
 # Need to bump up the heap space to run the MWDA:
-export SVJVM_FLAGS=-Xmx7G -Xss30m
+export SVJVM_FLAGS=-Xmx8G -Xss30m
 
 # Path from current directory to top level ableC repository
 ABLEC_BASE?=../../ableC
