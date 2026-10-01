@@ -996,6 +996,7 @@ top::Expr ::= @e1::Expr @e2::Expr
 production memberString implements MemberAccess
 top::Expr ::= @lhs::Expr deref::Boolean rhs::Name
 {
+  top.pp = forwardParent.pp;
   forwards to bindMemberAccess(lhs, deref, @rhs,
     case rhs.name of
     | "length" -> ableC_Expr { ((struct _string_s)$Expr{lhs.bindRefExpr}).length }
